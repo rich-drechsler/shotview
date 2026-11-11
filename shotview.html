@@ -10,7 +10,7 @@
 
 <html>
     <head>
-        <title>Billiard Shot View 1.0</title>
+        <title>Billiard Shot View 1.1</title>
 
         <style>
             /*
@@ -384,6 +384,7 @@
                 flex-direction: row;
                 align-items: center;
                 justify-content: space-between;
+                touch-action: none;
 
                 border-bottom: 1px dashed var(--title-color);
                 padding-bottom: var(--panel-padding);
@@ -415,6 +416,7 @@
                 flex-direction: row;
                 align-items: center;
                 justify-content: space-between;
+                touch-action: none;
             }
 
             .control-indented-row {
@@ -639,9 +641,9 @@
                     <span id="shot-angle-slider-value-label" style="font-size: var(--font-size);"></span>
                 </div>
                 <div id="shot-angle-slider-box" class="control-group-container">
-                    <div id="shot-angle-labels" class="control-space-between-row">
-                        <span></span>
-                        <span></span>
+                    <div id="shot-angle-slider-box-labels" class="control-space-between-row">
+                        <span>Left</span>
+                        <span>Right</span>
                     </div>
                     <input type="range" id="shot-angle-slider">
                 </div>
@@ -2115,7 +2117,8 @@
                 "shift-slider-view-player": ["input"],
                 "shot-angle-slider": ["input"],
                 "shot-angle-slider-box": ["wheel"],
-                "shot-angle-slider-title": ["wheel"],
+                "shot-angle-slider-box-labels": ["pointercancel", "pointerdown", "pointermove", "pointerup"],
+                "shot-angle-slider-title": ["pointercancel", "pointerdown", "pointermove", "pointerup", "wheel"],
                 "height-slider-box": ["wheel"],
                 "height-slider-view-player": ["input"],
                 "height-slider-view-top": ["input"],
@@ -2653,7 +2656,7 @@
                     case "height-slider-box":
                     case "shift-slider-box":
                     case "shift-slider-title":
-                        if ((target = handleSliderEvent(event, id.replace(/-(box|title)$/, "") + "-" + ID_TO_ELEMENT["view-select"].value)) != null) {
+                        if ((target = handleSliderEvent(event, id.replace(/-(box|box-labels|title)$/, "") + "-" + ID_TO_ELEMENT["view-select"].value)) != null) {
                             THREE_UNIVERSE.syncUniverseTo(target);
                         }
                         break;
@@ -2681,8 +2684,9 @@
                     case "shift-slider-view-player":
                     case "shot-angle-slider":
                     case "shot-angle-slider-box":
+                    case "shot-angle-slider-box-labels":
                     case "shot-angle-slider-title":
-                        if ((target = handleSliderEvent(event, id.replace(/-(box|title)$/, ""))) != null) {
+                        if ((target = handleSliderEvent(event, id.replace(/-(box|box-labels|title)$/, ""))) != null) {
                             THREE_UNIVERSE.syncUniverseTo(target);
                         }
                         break;
@@ -2787,7 +2791,9 @@
             }
 
             function handleSliderEvent(event, target_id) {
+                let current_target;
                 let current_value;
+                let delta_x;
                 let direction;
                 let max;
                 let min;
@@ -2795,18 +2801,20 @@
                 let step;
                 let stops;
                 let target;
+                let threshold;
                 let updated;
 
                 //
                 // Handles events for the slider associated with target_id. Standard slider
-                // adjustments and mouse wheel rotation are both supported. If the slider's
-                // value changes, any label associated with the slider is updated and the
-                // slider element is returned to the caller.
+                // adjustments, mouse wheel rotation, and horizontal pointer dragging on the
+                // slider's title or label row are supported. If the slider's value changes,
+                // any label associated with the slider is updated and the slider element is
+                // returned to the caller.
                 //
-                // NOTE - wheel events that fire on a slider's title element step through
-                // the preset values in target._stops (when defined) instead of using the
-                // slider's step attribute. If target._stops is a string (e.g., when it's
-                // initialized from :root), it's converted into a sorted array of numbers
+                // NOTE - wheel and pointer drag events that fire on a slider's title element
+                // step through the preset values in target._stops (when defined) instead of
+                // using the slider's step attribute. If target._stops is a string (e.g., when
+                // it's initialized from :root), it's converted into a sorted array of numbers
                 // the first time it's used.
                 //
 
@@ -2814,49 +2822,83 @@
 
                 if ((target = ID_TO_ELEMENT[target_id]) != null) {
                     if (!target.disabled) {
+                        current_target = event.currentTarget;
+                        direction = 0;
+
                         switch (event.type) {
                             case "change":
                             case "input":
                                 updated = target;
                                 break;
 
+                            case "pointerdown":
+                                if (event.button === 0) {
+                                    current_target._drag_start_x = event.clientX;
+                                    current_target.setPointerCapture(event.pointerId);
+                                }
+                                break;
+
+                            case "pointermove":
+                                if (current_target._drag_start_x != null) {
+                                    threshold = current_target.id.endsWith("-title") ? 25 : 8;
+                                    delta_x = event.clientX - current_target._drag_start_x;
+                                    if (Math.abs(delta_x) >= threshold) {
+                                        direction = Math.sign(delta_x);
+                                        current_target._drag_start_x += direction * threshold;
+                                    }
+                                }
+                                break;
+
+                            case "pointercancel":
+                            case "pointerup":
+                                if (current_target._drag_start_x != null) {
+                                    current_target._drag_start_x = null;
+                                    if (current_target.hasPointerCapture(event.pointerId)) {
+                                        current_target.releasePointerCapture(event.pointerId);
+                                    }
+                                }
+                                break;
+
                             case "wheel":
                                 direction = (Math.sign(event.deltaY) < 0) ? 1 : -1;    // standardize scroll direction
-                                current_value = parseFloat(target.value);
-                                min = parseFloat(target.min);
-                                max = parseFloat(target.max);
-                                next_value = current_value;
-
-                                if (event.currentTarget.id.endsWith("-title") && target._stops != null) {
-                                    if (typeof target._stops === "string") {
-                                        target._stops = target._stops
-                                            .replace(/^["']|["']$/g, "")
-                                            .split(/[\s,]+/)
-                                            .filter(s => s !== "")
-                                            .map(Number)
-                                            .sort((a, b) => a - b);
-                                    }
-                                    stops = target._stops;
-                                    if (direction > 0) {
-                                        next_value = stops.find(s => s > current_value) ?? current_value;
-                                    } else {
-                                        next_value = stops.findLast(s => s < current_value) ?? current_value;
-                                    }
-                                    next_value = Math.min(Math.max(next_value, min), max);
-                                } else {
-                                    step = parseFloat(target.step) || 1;
-                                    next_value = Math.min(Math.max(current_value + (direction * step), min), max);
-                                }
-
-                                if (current_value !== next_value) {
-                                    target.value = next_value;
-                                    updated = target;
-                                }
                                 break;
 
                             default:
                                 throw new Error(`missing case for event type ${event.type}`);
                                 break;
+                        }
+
+                        if (direction !== 0) {
+                            current_value = parseFloat(target.value);
+                            min = parseFloat(target.min);
+                            max = parseFloat(target.max);
+                            next_value = current_value;
+
+                            if (current_target.id.endsWith("-title") && target._stops != null) {
+                                if (typeof target._stops === "string") {
+                                    target._stops = target._stops
+                                        .replace(/^["']|["']$/g, "")
+                                        .split(/[\s,]+/)
+                                        .filter(s => s !== "")
+                                        .map(Number)
+                                        .sort((a, b) => a - b);
+                                }
+                                stops = target._stops;
+                                if (direction > 0) {
+                                    next_value = stops.find(s => s > current_value) ?? current_value;
+                                } else {
+                                    next_value = stops.findLast(s => s < current_value) ?? current_value;
+                                }
+                                next_value = Math.min(Math.max(next_value, min), max);
+                            } else {
+                                step = parseFloat(target.step) || 1;
+                                next_value = Math.min(Math.max(current_value + (direction * step), min), max);
+                            }
+
+                            if (current_value !== next_value) {
+                                target.value = next_value;
+                                updated = target;
+                            }
                         }
                         syncLabelTo(updated);
                     }
