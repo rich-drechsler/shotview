@@ -53,6 +53,7 @@
                 --border-color: gainsboro;
                 --title-color: white;
                 --empty-color: black;
+                --drag-background-color: color-mix(in srgb, var(--background-color) 70%, black);
 
                 /*
                  * Fonts
@@ -425,6 +426,10 @@
             .control-indented-row {
                 position: relative;
                 left: 20px;
+            }
+
+            .active-drag {
+                background-color: var(--drag-background-color);
             }
 
             /*
@@ -2852,6 +2857,7 @@
                                 if (event.button === 0) {
                                     current_target._drag_start_x = event.clientX;
                                     current_target.setPointerCapture(event.pointerId);
+                                    current_target.classList.add("active-drag");
                                 }
                                 break;
 
@@ -2874,6 +2880,7 @@
                             case "pointerup":
                                 if (current_target._drag_start_x != null) {
                                     current_target._drag_start_x = null;
+                                    current_target.classList.remove("active-drag");
                                     if (current_target.hasPointerCapture(event.pointerId)) {
                                         current_target.releasePointerCapture(event.pointerId);
                                     }
