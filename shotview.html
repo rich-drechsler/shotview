@@ -1,0 +1,3150 @@
+<!DOCTYPE html>
+<!--
+ - Copyright (C) 2026 Richard L. Drechsler (https://github.com/rich-drechsler/shotview)
+ - SPDX-License-Identifier: MIT
+ -
+ - ======================================================================
+ - Developed in collaboration with Google Gemini 4 Argon (November 2026)
+ - ======================================================================
+ -->
+
+<html>
+    <head>
+        <title>Billiard Shot View 1.0</title>
+
+        <style>
+            /*
+             * The comments in this file are primarily for programmers who are familiar with
+             * JavaScript and HTML, and want to take a look at the source code. There isn't
+             * much user information in the source code comments, but it is available (via a
+             * Help button) when you run the application. The text displayed when that button
+             * is pressed is built from a single multiline string that's assigned to a variable
+             * named TABBED_HELP_DESCRIPTION. It's a very readable string and is the place to
+             * go for user information when you don't want to run this application.
+             *
+             * The original HTML version of this application hardcoded constants wherever they
+             * were needed. For example, colors were hex numbers that were used throughout the
+             * application and numbers, like the min, max, and initial value of a slider, were
+             * replicated everywhere. The application worked, but changing or improving it was
+             * a daunting proposition that I didn't want to tackle.
+             *
+             * The approach taken in this version tries to centralize all of the application's
+             * tunable parameters as CSS variables that are defined next in :root. All of them
+             * are also copied into the window.app.CSS_GLOBALS JavaScript object when the "CSS
+             * Globals Collector" module runs, so they're easy to access in any JavaScript code
+             * that runs after that module. Change the value that's assigned to any of the CSS
+             * variables defined in :root and that change should be reflected everywhere in the
+             * application the next time it's run.
+             *
+             * NOTE - there likely are better approaches, but this one seemed pretty easy and
+             * suitable for my purposes in this application. Handling element initialization
+             * is a bit tricky, but it's described in more detail in comments that immediately
+             * precede the block of variables that start with the "--initial-" prefix. Take a
+             * look at the initializeElements() function for the low level details.
+             */
+
+            :root {
+                /*
+                 * GUI Colors
+                 */
+
+                --background-color: dimgray;
+                --foreground-color: white;
+                --border-color: gainsboro;
+                --title-color: white;
+                --empty-color: black;
+
+                /*
+                 * Fonts
+                 */
+
+                --font-family: "Consolas", monospace;
+                --font-size: 16px;
+                --font-size-title: 18px;
+                --font-weight: bold;
+
+                /*
+                 * Opacity
+                 */
+
+                --enabled-opacity: 1.0;
+                --hidden-opacity: 0.0;
+                --disabled-opacity: 0.4;
+
+                /*
+                 * Panel Settings
+                 */
+
+                --panel-padding: 4px;
+                --panel-border-color: var(--border-color);
+                --panel-border-width: 2px;
+                --panel-border-style: solid;
+
+                /*
+                 * Help Settings
+                 */
+
+                --help-background-color: var(--background-color);
+                --help-foreground-color: var(--foreground-color);
+
+                --help-font-family: var(--font-family);
+                --help-font-size: var(--font-size);
+                --help-font-size-title: var(--font-size-title);
+                --help-font-weight: var(--font-weight);
+
+                --help-panel-border-color: var(--panel-border-color);
+                --help-panel-border-width: var(--panel-border-width);
+                --help-panel-border-style: var(--panel-border-style);
+
+                --help-tab-foreground-color: wheat;
+                --help-level-indent: 12px;
+                --help-heading-margin-bottom: 3px;
+                --help-heading-foreground-color: var(--help-tab-foreground-color);
+
+                /*
+                 * Three.js Settings
+                 */
+
+                --three-table-color: darkgreen;
+
+                --three-cue-ball-color: thistle;
+                --three-cue-ball-roughness: 0.2;
+                --three-cue-ball-metalness: 0.1;
+
+                --three-object-ball-color: lightskyblue;
+                --three-object-ball-roughness: 0.2;
+                --three-object-ball-metalness: 0.1;
+
+                --three-ghost-ball-color: gainsboro;
+                --three-ghost-ball-roughness: 0.5;
+                --three-ghost-ball-metalness: 0.0;
+
+                --three-contact-caps-color: darkorange;
+                --three-contact-caps-roughness: 0.2;
+                --three-contact-caps-metalness: 0.1;
+
+                --three-aim-line-color: linen;
+                --three-contact-line-color: darkorange;
+                --three-pocket-line-color: limegreen;
+                --three-centers-box-color: var(--three-pocket-line-color);
+
+                --three-ambient-light-color: darkgray;
+                --three-ambient-light-intensity: 1.0;
+                --three-overhead-light-color: white;
+                --three-overhead-light-intensity: 0.7;
+                --three-player-light-color: white;
+                --three-player-light-intensity: 0.4;
+
+                /*
+                 * Values assigned below don't have to be associated with the dimensions of
+                 * a real pool table. Instead, the table's length and width are defined in
+                 * "ball radius" units.
+                 *
+                 * NOTE - using calc() here might be tempting, but it's a CSS function that
+                 * won't work everywhere in this application.
+                 */
+
+                --three-ball-radius: 1;                 /* == minimum z for player camera */
+                --three-table-length: 32;               /* == 16 balls long */
+                --three-table-width: 16;                /* == 8 balls wide */
+
+                /*
+                 * Initial Settings - CSS variables with names that start with "--initial-"
+                 * are used during initialization, primarily to configure elements, like
+                 * sliders or checkboxes. Take a look at the initializeElements() function
+                 * if you want to see exactly how these CSS variables are processed.
+                 *
+                 * Everything that follows the "--initial-" prefix, up to an underscore, is
+                 * assumed to be an id that's eventually assigned to a GUI element (e.g., a
+                 * slider or checkbox). That underscore is a separator and whatever follows
+                 * it (up to a ':') is assumed to be the name of a property that belongs to
+                 * the element associated with that id. The whitespace trimmed string that
+                 * follows the colon is the value that's assigned to that property.
+                 *
+                 * NOTE - a property name that begins with an underscore (i.e., there were
+                 * two or more consecutive underscores in the CSS variable name) is assumed
+                 * to be the name of a property that doesn't currently exist. A leading '_'
+                 * in that name also means it should appear at or near the beginning of any
+                 * dump of that element, which can be useful during debugging.
+                 *
+                 * NOTE - the order of the definitions in each "block" of variables could
+                 * make a difference (e.g., min and max probably should be assigned before
+                 * value), but there's a validation step in initializeElements() that looks
+                 * for unexpected modifications to these values and throws an error if any
+                 * are found.
+                 *
+                 * NOTE - values assigned to CSS variables that end in "_label_descriptor"
+                 * are parsed by the syncLabelTo() function. What's recognized is limited
+                 * and currently just includes "this", which resolves to the element that
+                 * owns the "_label_descriptor" property, and abs() when we want to make
+                 * sure the string displayed in the associated label doesn't start with a
+                 * negative sign.
+                 */
+
+                --initial-aim-line-checkbox_checked: true;
+                --initial-aim-line-extended-checkbox_checked: false;
+                --initial-centers-box-checkbox_checked: false;
+                --initial-contact-caps-checkbox_checked: true;
+                --initial-contact-line-checkbox_checked: true;
+                --initial-contact-line-extended-checkbox_checked: true;
+                --initial-pocket-line-checkbox_checked: true;
+                --initial-pocket-line-cloned-checkbox_checked: false;
+
+                --initial-shot-angle-slider_min: -90;
+                --initial-shot-angle-slider_max: 90;
+                --initial-shot-angle-slider_value: 30;
+                --initial-shot-angle-slider__label_id: "shot-angle-slider-value-label";
+                --initial-shot-angle-slider__label_descriptor: "abs(this.value) + '°'";         /* this ==> shot-angle-slider */
+                --initial-shot-angle-slider__stops: "-90, -49, -30, -14, 0, 14, 30, 49, 90";
+
+                --initial-cb-position-slider_min: 0;
+                --initial-cb-position-slider_max: 100;
+                --initial-cb-position-slider_step: any;
+                --initial-cb-position-slider_value: 16;
+
+                --initial-ob-position-slider_min: 0;
+                --initial-ob-position-slider_max: 100;
+                --initial-ob-position-slider_step: any;
+                --initial-ob-position-slider_value: 53;
+
+                --initial-cb-transparency-slider_min: 0;
+                --initial-cb-transparency-slider_max: 10;
+                --initial-cb-transparency-slider_value: 2;
+                --initial-cb-transparency-slider__material_name: cue_ball_material;             /* universe property name */
+
+                --initial-ob-transparency-slider_min: 0;
+                --initial-ob-transparency-slider_max: 10;
+                --initial-ob-transparency-slider_value: 2;
+                --initial-ob-transparency-slider__material_name: object_ball_material;          /* universe property name */
+
+                --initial-gb-transparency-slider_min: 0;
+                --initial-gb-transparency-slider_max: 10;
+                --initial-gb-transparency-slider_value: 6;
+                --initial-gb-transparency-slider__material_name: ghost_ball_material;           /* universe property name */
+
+                --initial-height-slider-view-top_min: 0;
+                --initial-height-slider-view-top_max: 100;
+                --initial-height-slider-view-top_value: 70;
+                --initial-height-slider-view-top__min_zoom: 0.5;
+                --initial-height-slider-view-top__max_zoom: 4;
+
+                --initial-shift-slider-view-top_min: -100;
+                --initial-shift-slider-view-top_max: 100;
+                --initial-shift-slider-view-top_value: 0;
+                --initial-shift-slider-view-top_disabled: true;
+
+                --initial-height-slider-view-player_min: 0;
+                --initial-height-slider-view-player_max: 100;
+                --initial-height-slider-view-player_value: 25;
+                --initial-height-slider-view-player__min_z: 1;
+                --initial-height-slider-view-player__max_z: 30;
+
+                --initial-shift-slider-view-player_min: -100;
+                --initial-shift-slider-view-player_max: 100;
+                --initial-shift-slider-view-player_value: 0;
+                --initial-shift-slider-view-player__max_shift: 1;
+                --initial-shift-slider-view-player__label_id: "shift-slider-value-label";
+                --initial-shift-slider-view-player__label_descriptor: "this.value";
+
+                --initial-view-select_value: view-top;
+            }
+
+            * {
+                box-sizing: border-box;
+
+                /*
+                 * Disable double/triple click text highlighting.
+                 */
+
+                user-select: none;
+                -webkit-user-select: none;
+            }
+
+            body {
+                display: grid;
+                margin: 0;
+                padding: 0;
+                overflow: hidden;
+                height: 100vh;
+                grid-template-columns: 320px 1fr;
+                grid-template-rows: 1fr auto;
+
+                background-color: var(--background-color);
+                color: var(--foreground-color);
+
+                font-family: var(--font-family);
+                font-weight: var(--font-weight);
+                font-size: var(--font-size);
+            }
+
+            /*
+             * Form element rules.
+             */
+
+            button, select, input, textarea {
+                font: inherit;
+            }
+
+            input[type="range"] {
+                display: block;
+                width: 100%;
+            }
+
+            /*
+             * Panels - for top-level browser window organization.
+             */
+
+            #control-panel {
+                display: flex;
+                grid-column: 1;
+                grid-row: 1;
+                height: 100%;
+                flex-direction: column;
+                overflow-y: auto;
+                min-height: 0;
+
+                background-color: var(--empty-color);
+
+                border-color: var(--panel-border-color);
+                border-width: var(--panel-border-width);
+                border-style: var(--panel-border-style);
+
+                padding-left: var(--panel-padding);
+                padding-right: var(--panel-padding);
+                row-gap: var(--panel-padding);
+            }
+
+            #canvas-panel {
+                grid-column: 2;
+                grid-row: 1;
+                height: 100%;
+                position: relative;
+                min-width: 0;
+                min-height: 0;
+
+                background-color: var(--background-color);
+
+                border-color: var(--panel-border-color);
+                border-width: var(--panel-border-width);
+                border-style: var(--panel-border-style);
+            }
+
+            #footer-panel {
+                display: flex;
+                grid-column: 1 / span 2;
+                grid-row: 2;
+                height: 100%;
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: center;
+                z-index: 10;
+
+                background-color: var(--background-color);
+
+                border-color: var(--panel-border-color);
+                border-width: var(--panel-border-width);
+                border-style: var(--panel-border-style);
+
+                padding: var(--panel-padding);
+            }
+
+            /*
+             * Control sub-panels - for checkboxes, sliders, labels, and anything else that
+             * ends up in the control-panel.
+             */
+
+            .control-group {
+                width: 100%;
+                flex: none;
+
+                color: var(--foreground-color);
+                background-color: var(--background-color);
+
+                border-color: var(--border-color);
+                border-width: var(--panel-border-width);
+                border-style: inset;
+
+                padding: var(--panel-padding);
+            }
+
+            .control-group:has(input:disabled:not([hidden])) {
+                opacity: var(--disabled-opacity);
+            }
+
+            .control-group:has(input:disabled:not([hidden])) .control-group-title span:last-child {
+                visibility: hidden;
+            }
+
+            .control-group-title {
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+
+                border-bottom: 1px dashed var(--title-color);
+                padding-bottom: var(--panel-padding);
+                margin-bottom: 10px;
+
+                color: var(--title-color);
+                font-size: var(--font-size-title);
+            }
+
+            .control-group-container {
+                align-items: center;
+                padding-left: 10px;
+                padding-right: 10px;
+                margin-bottom: var(--panel-padding);
+            }
+
+            .control-flex-start-row {
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                justify-content: flex-start;
+
+                white-space: nowrap;
+                margin-bottom: var(--panel-padding);
+            }
+
+            .control-space-between-row {
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .control-indented-row {
+                position: relative;
+                left: 20px;
+            }
+
+            /*
+             * These are used to force sliders that control the cameras associated with the
+             * selected "view" to occupy the same "space" in the control panel. The sliders
+             * in the group that aren't associated with the current view are hidden whenever
+             * the view changes, so only one slider in the group will be displayed.
+             */
+
+            .slider-group {
+                display: grid;
+            }
+
+            .slider-group > input {
+                grid-area: 1 / 1;
+                width: 100%;
+                height: 100%;
+                margin: 0;
+            }
+
+            .slider-group > input[hidden] {
+                display: none !important;
+            }
+
+            /*
+             * Custom help text rules - they all start with the "help-" prefix and are only
+             * used to build the help text tabbed panel.
+             */
+
+            #help-modal {
+                display: flex;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                position: fixed;
+                justify-content: center;
+                align-items: flex-start;
+                z-index: 100;
+
+                background-color: rgba(0, 0, 0, calc(1.0 - var(--disabled-opacity)));
+                padding-top: 2vh;
+
+                opacity: var(--hidden-opacity);
+                pointer-events: none;
+            }
+
+            #help-modal.modal-open {
+                opacity: var(--enabled-opacity);
+                pointer-events: auto;
+            }
+
+            #help-content {
+                display: flex;
+                width: 900px;
+                max-width: 90vw;
+                text-align: left;
+                flex-direction: column;
+
+                background-color: var(--help-background-color);
+                color: var(--help-foreground-color);
+                border-color: var(--help-panel-border-color);
+                border-width: var(--help-panel-border-width);
+                border-style: inset;
+                padding: 20px;
+
+                font-family: var(--help-font-family);
+                font-weight: var(--help-font-weight);
+                font-size: var(--help-font-size);
+            }
+
+            #help-tab-container {
+                display: flex;
+                gap: 2px;
+                justify-content: start;
+
+                background-color: var(--help-background-color);
+                border-bottom: 1px solid var(--help-tab-foreground-color);
+                margin-bottom: 10px;
+            }
+
+            #help-panel-container {
+                text-align: left;
+                max-height: 60vh;
+                overflow-y: auto;
+
+                width: 100%;
+                padding: 5px 0;
+            }
+
+            #help-footer-panel {
+                display: grid;
+                width: 100%;
+                justify-content: center;
+
+                margin-top: 25px;
+            }
+
+            .help-tab-button {
+                border: 1px solid transparent;
+                border-bottom: none;
+                padding: 8px 12px;
+
+                background-color: var(--help-background-color);
+                color: color-mix(in srgb, var(--help-tab-foreground-color) 80%, black);
+
+                font-family: var(--help-font-family);
+                font-weight: var(--help-font-weight);
+                font-size: var(--help-font-size-title);
+            }
+
+            .help-tab-button:hover {
+                color: var(--help-tab-foreground-color);
+            }
+
+            .help-tab-button.active-tab {
+                position: relative;
+                top: 1px;
+                border-top: 2px solid var(--help-tab-foreground-color);
+                border-left: 2px solid var(--help-tab-foreground-color);
+                border-right: 2px solid var(--help-tab-foreground-color);
+
+                background-color: var(--help-background-color);
+                color: var(--help-tab-foreground-color);
+            }
+
+            .help-tab-panel {
+                display: none;
+            }
+
+            .help-tab-panel.active-panel {
+                display: block;
+            }
+
+            /*
+             * Color classes - they're currently only used to apply colors to a few words
+             * or abbreviations in the HTML help text. Guarantees that CSS color variable
+             * changes are reflected in the displayed HTML help text.
+             */
+
+            .color-of-CB {
+                color: var(--three-cue-ball-color);
+            }
+
+            .color-of-OB {
+                color: var(--three-object-ball-color);
+            }
+
+            .color-of-GB {
+                color: var(--three-ghost-ball-color);
+            }
+
+            .color-of-aim-line {
+                color: var(--three-aim-line-color);
+            }
+
+            .color-of-centers-box {
+                color: var(--three-centers-box-color);
+            }
+
+            .color-of-contact-caps {
+                color: var(--three-contact-caps-color);
+            }
+
+            .color-of-contact-line {
+                color: var(--three-contact-line-color);
+            }
+
+            .color-of-pocket-line {
+                color: var(--three-pocket-line-color);
+            }
+        </style>
+    </head>
+
+    <body>
+        <div id="control-panel">
+            <div class="control-group">
+                <div class="control-group-title">
+                    <span>Visual Aids</span>
+                    <span></span>
+                </div>
+                <div id="visual-aids-box" class="control-group-container">
+                    <div class="control-flex-start-row">
+                        <input type="checkbox" id="aim-line-checkbox"><label for="aim-line-checkbox">Aim<span style="color: var(--three-aim-line-color);">&nbsp;Line</span></label>
+                    </div>
+                    <div class="control-flex-start-row control-indented-row">
+                        <input type="checkbox" id="aim-line-extended-checkbox"><label for="aim-line-extended-checkbox">Extended</label>
+                    </div>
+
+                    <div class="control-flex-start-row">
+                        <input type="checkbox" id="contact-line-checkbox"><label for="contact-line-checkbox">Contact<span style="color: var(--three-contact-line-color);">&nbsp;Line</span></label>
+                    </div>
+                    <div class="control-flex-start-row control-indented-row">
+                        <input type="checkbox" id="contact-line-extended-checkbox"><label for="contact-line-extended-checkbox">Extended</label>
+                    </div>
+
+                    <div class="control-flex-start-row">
+                        <input type="checkbox" id="pocket-line-checkbox"><label for="pocket-line-checkbox">Pocket<span style="color: var(--three-pocket-line-color);">&nbsp;Line</span></label>
+                    </div>
+                    <div class="control-flex-start-row control-indented-row">
+                        <input type="checkbox" id="pocket-line-cloned-checkbox"><label for="pocket-line-cloned-checkbox">Cloned</label>
+                    </div>
+
+                    <div class="control-flex-start-row">
+                        <input type="checkbox" id="centers-box-checkbox"><label for="centers-box-checkbox">Centers<span style="color: var(--three-centers-box-color);">&nbsp;Box</span></label>
+                    </div>
+
+                    <div class="control-flex-start-row">
+                        <input type="checkbox" id="contact-caps-checkbox"><label for="contact-caps-checkbox">Contact<span style="color: var(--three-contact-caps-color);">&nbsp;Caps</span></label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div id="shot-angle-slider-title" class="control-group-title">
+                    <span>Shot Angle</span>
+                    <span id="shot-angle-slider-value-label" style="font-size: var(--font-size);"></span>
+                </div>
+                <div id="shot-angle-slider-box" class="control-group-container">
+                    <div id="shot-angle-labels" class="control-space-between-row">
+                        <span></span>
+                        <span></span>
+                    </div>
+                    <input type="range" id="shot-angle-slider">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-group-title">
+                    <span>Position</span>
+                    <span></span>
+                </div>
+                <div id="cb-position-slider-box" class="control-group-container">
+                    <div id="cb-position-slider-box-labels" class="control-space-between-row">
+                        <span style="color: var(--three-cue-ball-color);">CB</span>
+                        <span></span>
+                    </div>
+                    <input type="range" id="cb-position-slider">
+                </div>
+
+                <div id="ob-position-slider-box" class="control-group-container">
+                    <div id="ob-position-slider-box-labels" class="control-space-between-row">
+                        <span style="color: var(--three-object-ball-color);">OB</span>
+                        <span></span>
+                    </div>
+                    <input type="range" id="ob-position-slider">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-group-title">
+                    <span>Transparency</span>
+                    <span></span>
+                </div>
+                <div id="cb-transparency-slider-box" class="control-group-container">
+                    <div id="cb-transparency-slider-box-labels" class="control-space-between-row">
+                        <span style="color: var(--three-cue-ball-color);">CB</span>
+                        <span></span>
+                    </div>
+                    <input type="range" id="cb-transparency-slider">
+                </div>
+                <div id="ob-transparency-slider-box" class="control-group-container">
+                    <div id="ob-transparency-slider-box-labels" class="control-space-between-row">
+                        <span style="color: var(--three-object-ball-color);">OB</span>
+                        <span></span>
+                    </div>
+                    <input type="range" id="ob-transparency-slider">
+                </div>
+                <div id="gb-transparency-slider-box" class="control-group-container">
+                    <div id="gb-transparency-slider-box-labels" class="control-space-between-row">
+                        <span style="color: var(--three-ghost-ball-color);">GB</span>
+                        <span></span>
+                    </div>
+                    <input type="range" id="gb-transparency-slider">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-group-title">
+                    <span>Camera Height</span>
+                    <span></span>
+                </div>
+                <div id="height-slider-box" class="control-group-container">
+                    <div id="height-slider-box-labels" class="control-space-between-row">
+                        <span>Down</span>
+                        <span>Up</span>
+                    </div>
+                    <div id="height-slider-group" class="slider-group">
+                        <input type="range" id="height-slider-view-top">
+                        <input type="range" id="height-slider-view-player" hidden>
+                    </div>
+                </div>
+            </div>
+
+            <div id="control-group-shift" class="control-group">
+                <div id="shift-slider-title" class="control-group-title">
+                    <span>Camera Shift</span>
+                    <span id="shift-slider-value-label" style="font-size: var(--font-size);"></span>
+                </div>
+                <div id="shift-slider-box" class="control-group-container">
+                    <div id="shift-slider-box-labels" class="control-space-between-row">
+                        <span>Left</span>
+                        <span>Right</span>
+                    </div>
+                    <div id="shift-slider-group" class="slider-group">
+                        <input type="range" id="shift-slider-view-top">
+                        <input type="range" id="shift-slider-view-player" hidden>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="canvas-panel"></div>
+
+        <div id="footer-panel">
+            <button id="button-reset">Reset</button>
+
+            <select id="view-select">
+                <option value="view-top">Top View</option>
+                <option value="view-player">Player View</option>
+            </select>
+
+            <button id="help-modal-open">Help</button>
+        </div>
+
+        <div id="help-modal">
+            <div id="help-content">
+                <div id="help-tab-container"></div>
+                <div id="help-panel-container"></div>
+                <div id="help-footer-panel">
+                    <button id="help-modal-close">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!--
+         - Our importmap script selects the JavaScript 3D library that we depend on in this
+         - application. It's downloaded from unpkg.com, which is a public content delivery
+         - network (CDN) that uses Cloudflare's infrastructure.
+         -
+         - We're currently using version 0.160.0 of the three.module.js file and we've also
+         - supplied the SHA-384 cryptographic hash of that file (calculated using openssl).
+         - That lets browsers validate the downloaded file before they start using it.
+         -
+         - NOTE - point your browser at
+         -
+         -     https://unpkg.com/three@0.160.0/build/three.module.js
+         -
+         - and you'll see the file we download. Right click on the window that's displaying
+         - the raw JavaScript to copy it to your computer, perhaps to validate the checksum
+         - that we calculated. On Linux we used the command
+         -
+         -     echo "sha384-$(openssl dgst -sha384 -binary three.module.js | openssl base64 -A)"
+         -
+         - to generate our checksum, assuming the raw JavaScript was saved in a file named
+         - three.module.js.
+         -->
+
+        <script type="importmap">
+            {
+                "imports": {
+                    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+                },
+                "integrity": {
+                    "https://unpkg.com/three@0.160.0/build/three.module.js": "sha384-61S/Nu32S3E5+n+KpCOTb2eRYps6fVKm+9Gz1QBvSePFthb46f063Aa/qe/lykFZ"
+                }
+            }
+        </script>
+
+        <script type="module" data-name="Startup Error Handling">
+            window.app = window.app || {};
+
+            //
+            // Simple error handling that's installed by this module and removed by the main
+            // module using afterInitialize() after the application is completely initialized
+            // and ready to run.
+            //
+            // NOTE - this is the first module because windowErrorListener() is supposed to
+            // be activated before the real application specific modules run.
+            //
+
+            function windowErrorListener(event) {
+                //
+                // This function is just supposed to point users at the browser console if
+                // something goes wrong while the application is getting ready to run. It's
+                // installed at the end of this module and removed whenever the application
+                // calls window.app.afterInitialize().
+                //
+
+                document.body.innerHTML = `
+                    <div style="
+                        display: flex;
+                        position: fixed;
+                        inset: 0;
+                        flex-direction: column;
+                        justify-content: center;
+                        align-items: center;
+                        background-color: black;
+                        color: tomato;
+                        font-size: 24px;
+                        font-family: sans-serif;
+                        padding: 20px;
+                        text-align: center;">
+                        <p>
+                        The application failed to load properly.
+                        <br>
+                        Check the developer browser console for more details.
+                        </p>
+                    </div>
+                `;
+
+                console.error(event.error || event.message);
+            }
+
+            window.app.afterInitialize = () => {
+                //
+                // Takes care of any cleanup that has to happen right after the application
+                // is completely initialized. All it currently does is remove the temporary
+                // "error" listener that will be added at the end of this module.
+                //
+
+                window.removeEventListener("error", windowErrorListener);
+            }
+
+            //
+            // Assigning the error listener directly to window.onerror also works, but using
+            // window.addEventListener() and window.removeEventListener() is the recommended
+            // approach.
+            //
+
+            window.addEventListener("error", windowErrorListener);
+        </script>
+
+        <script type="module" data-name="Three.js Importer">
+            window.app = window.app || {};
+
+            //
+            // The purpose of this module is to force the browser to download the URL that's
+            // associated with "three" in our "importmap" module and make sure its SHA-384
+            // hash matches the one recorded in our "integrity" dictionary. If the download
+            // or integrity check fails the browser aborts this script and window.app.THREE
+            // will be undefined, and that's something we can check in the "Main Module".
+            //
+
+            import * as THREE from "three";
+            window.app.THREE = THREE;
+        </script>
+
+        <script type="module" data-name="CSS Globals Collector">
+            window.app = window.app || {};
+
+            //
+            // This module builds an object named window.app.CSS_GLOBALS that's used to map
+            // CSS global variable names to their values. It ends up being a straightforward
+            // way to access them in our JavaScript code, but right now that JavaScript code
+            // only needs the ones that start with --initial and --three.
+            //
+            // NOTE - using getComputedStyle() makes sure var() is resolved in our copy, but
+            // it wouldn't help with calc().
+            //
+
+            window.app.CSS_GLOBALS = (() => {
+                let map;
+                let prop;
+                let styles;
+
+                //
+                // Grabs everything in :root that starts with "--" and adds each name and its
+                // value to map, which is eventually returned by the function and assigned to
+                // window.app.CSS_GLOBALS.
+                //
+
+                map = {};
+                styles = getComputedStyle(document.documentElement);
+
+                for (prop of styles) {
+                    if (prop.startsWith("--")) {
+                        map[prop] = styles.getPropertyValue(prop).trim();
+                    }
+                }
+
+                return(map);
+            })();
+        </script>
+
+        <script type="module" data-name="ID To Element Mapper">
+            window.app = window.app || {};
+
+            //
+            // This module builds an object (named window.app.ID_TO_ELEMENT) that's used to
+            // map a string to the element that has that string as its id attribute. Means
+            // one quick lookup can find the element that "owns" an id.
+            //
+
+            window.app.ID_TO_ELEMENT = (() => {
+                let cache;
+                let dom_ids;
+                let element;
+                let id;
+
+                //
+                // Finds all of the document elements with id attributes, stores those ids
+                // in an array, and then uses that Array to build the ID_TO_ELEMENT map.
+                //
+                // NOTE - added "browser-window" as an id that can be used to attach events
+                // to the browser window. Added to cache first to trigger an error if it's
+                // ever used as an id.
+                //
+
+                cache = {
+                    "browser-window": window,           // reserved "id" for the browser window
+                };
+
+                dom_ids = Array.from(document.querySelectorAll("[id]")).map(el => el.id).filter(id => id != null && id !== "");
+
+                for (id of dom_ids) {
+                    if ((element = document.getElementById(id)) != null) {
+                        if (cache[id] === undefined) {
+                            cache[id] = element;
+                        } else {
+                            throw new Error(`element id ${id} is used more than once`);
+                        }
+                    }
+                }
+                return(cache);
+            })();
+        </script>
+
+        <script type="module" data-name="Application Event Activator">
+            window.app = window.app || {};
+
+            //
+            // This module is responsible for attaching event listeners to eligible elements.
+            // In this application "eligible element" means it exists as the value associated
+            // with an id key string in the window.app.ID_TO_ELEMENT object.
+            //
+
+            window.app.attachListenerToEvents = (listener, id_to_events) => {
+                let element;
+                let events;
+                let id;
+
+                //
+                // This is the function that the "Main Module" uses to initialize events. It
+                // makes sure the listener function is called whenever certain events fire on
+                // elements that are identified by their id strings. The id_to_events argument
+                // maps id key strings to arrays that usually enumerate the event type strings
+                // that the element is supposed to respond to.
+                //
+                // NOTE - right now this function is only called once, which means all of the
+                // events this application has to deal with are routed through a single listener
+                // function. If you're really trying to follow this stuff, look for that call
+                // and the declaration of ID_TO_EVENTS in the "Main Module".
+                //
+
+                if (typeof listener === "function") {
+                    if (id_to_events != null) {
+                        for ([id, events] of Object.entries(id_to_events)) {
+                            if ((element = window.app.ID_TO_ELEMENT[id]) != null) {
+                                activateListener(listener, element, events);
+                            } else {
+                                throw new Error(`element id ${id} is not a recognized key in window.app.ID_TO_ELEMENT`);
+                            }
+                        }
+                    }
+                } else {
+                    throw new Error(`the listener argument ${listener} is not a function`);
+                }
+            }
+
+            function activateListener(listener, element, events) {
+                let args;
+                let entry;
+                let index;
+                let options;
+
+                //
+                // Walks through the events array and calls element.addEventListener() for each
+                // event type string that's found. If an event type string is followed by an
+                // object (that's not an array) it's included in the addEventListener() call
+                // as the options argument.
+                //
+                // NOTE - nested arrays in events and the optional addEventListener() argument
+                // are both supported here, even though neither feature is currently needed in
+                // this application.
+                //
+
+                if (element != null && events !== null && Array.isArray(events)) {
+                    for (index = 0; index < events.length; index++) {
+                        if ((entry = events[index]) != null) {
+                            if (typeof entry === "string") {    // it's the event type argument
+                                args = [entry, listener];
+                                if ((options = events[index+1]) != null) {      // peek at the next element
+                                    if (typeof options === "object" && !Array.isArray(options)) {
+                                        //
+                                        // It's supposed to be the optional options argument that can
+                                        // be handed to addEventListener() as its last argument. Take
+                                        // a look at the MDN documentation of addEventListener() for
+                                        // more details.
+                                        //
+                                        args.push(options);
+                                        index++;
+                                    }
+                                }
+                                element.addEventListener(...args);
+                            } else if (Array.isArray(entry)) {
+                                activateListener(listener, element, entry);
+                            } else {
+                                throw new Error(`event listener entry for element ${element} isn't a string or an array`);
+                            }
+                        }
+                    }
+                }
+            }
+        </script>
+
+        <script type="module" data-name="Tabbed Panel Parser">
+            window.app = window.app || {};
+
+            //
+            // This module contains functions that translate a fairly structured description
+            // of a tabbed help panel into a representation that should be reasonably easy to
+            // translate into HTML. Two separate steps means there's a chance of reusing some
+            // of the "help" support code and also isolates most of the tricky error checking
+            // to this module (so it doesn't have to be done when the HTML is built).
+            //
+            // NOTE - the module named "Tabbed Help Panel Builder", which should follow this
+            // module, is where to go if you want an example of the text that's accepted by
+            // the parseTabbedPanelLines() function. It's also where you'll find a function
+            // that translates the output of parseTabbedPanelLines() into HTML.
+            //
+
+            window.app.parseTabbedPanelDescription = (description) => {
+                let stack;
+
+                //
+                // This function is called with a single multi-line string description of the
+                // tabbed panel. That string is split into an array of lines when it's handed
+                // to the "parser" and, if there's no error, a different array representation
+                // of the tabbed panel is returned to the caller.
+                //
+
+                stack = null;
+
+                if (description != null) {
+                    if (typeof description === "string") {
+                        stack = parseTabbedPanelLines(description.split("\n"));
+                    } else {
+                        throw new Error("the description argument must be a string");
+                    }
+                }
+
+                return(stack);
+            }
+
+            function parseTabbedPanelLines(lines) {
+                let argument;
+                let command;
+                let indent;
+                let index;
+                let line;
+                let registered;
+                let selector;
+                let stack;
+                let tokenizer;
+                let tokenizer_failed;
+                let tokens;
+                let value;
+
+                //
+                // Main job of this function is to process input lines one at a time, validate
+                // them, and build the representation of those lines in an array (named stack)
+                // that's returned to the caller. Translating the content of that array into
+                // HTML is the caller's responsibility, but all the work done by this function,
+                // including the extensive error checking, make it a pretty easy job.
+                //
+                // Eventually hope to add more documentation to this function, but it's not a
+                // priority right now. Perhaps the best way to proceed, if you want to dig into
+                // the code on your own, is to hand the tokenizer regular expression to an AI
+                // and then use its explanation and the comments in the switch statement and
+                // the support functions to work through the code.
+                //
+                // NOTE - the tokenizer regex is a bit stricter than you might expect, mostly
+                // to reduce some of the validation that's needed after a line is accepted by
+                // the regular expression. It should guarantee that when there's a match the
+                // first three tokens won't be null (or undefined) and that space is the only
+                // whitespace character allowed after the opening "[" that marks the start of
+                // the selector string.
+                //
+                // NOTE - the tokenizer_failed regex is only used to check a line that failed
+                // tokenizer matching. It tries to "guess" if the failure looks like a mistake
+                // that deserves a console error message. Right now matching tokenizer_failed
+                // triggers a pushError() call, which eventually kills the application, but I'm
+                // not convinced that's the best approach.
+                //
+
+                tokenizer = /^[ \t]*[\[]([^\]]+)[\]]([ ]*)([^\s]*([ ]+[^\s]+)*)[ ]*$/;
+                tokenizer_failed = /^[ \t]*[\[][\S ]+/;
+
+                registered = new Map();
+
+                stack = [
+                    //
+                    // Make sure the stack is never empty so it's always safe to look at the top
+                    // element. We're currently not doing anything with FRAME elements, but it's
+                    // not hard to imagine some potentially useful extensions.
+                    //
+
+                    {"type": "FRAME", "arg": 1, "value": {}, "level": 0}
+                ];
+
+                for (index = 0; index < lines.length; index++) {
+                    line = lines[index];
+                    if ((tokens = tokenizer.exec(line)) != null) {
+                        selector = tokens[1];
+                        indent = tokens[2];
+                        value = tokens[3];
+
+                        //
+                        // Use the first character in selector (i.e., tokens[1]) as the command and
+                        // whatever follows it as the argument.
+                        //
+
+                        command = selector[0];
+                        argument = (selector.length > 1) ? selector.slice(1) : "";
+
+                        switch (command) {
+                            case "^":                   // Tab
+                                if (/^[\d ]?$/.test(argument)) {
+                                    if (value !== "") {
+                                        if (!registered.has(value)) {
+                                            pushTab(stack, command, value, pickLevel(stack, command, argument, indent));
+                                            registered.set(value, index);
+                                        } else {
+                                            console.error("lines[%d]: tab name |%s| has already been used.\n", index, value);
+                                            pushError(stack);
+                                        }
+                                    } else {
+                                        console.error("lines[%d]: required tab name has not been set.\n", index);
+                                        pushError(stack);
+                                    }
+                                } else {
+                                    console.error("lines[%d]: invalid argument=|%s| in selector |%s|\n", index, argument, selector);
+                                    pushError(stack);
+                                }
+                                break;
+
+                            case "H":                   // Heading - normal size
+                            case "h":                   // Heading - smaller size
+                                if (/^[\d ]?$/.test(argument)) {
+                                    if (value !== "") {
+                                        pushHeading(stack, command, value, pickLevel(stack, command, argument, indent));
+                                    } else {
+                                        console.error("lines[%d]: required heading text has not been set.\n", index);
+                                        pushError(stack);
+                                    }
+                                } else {
+                                    console.error("lines[%d]: invalid argument=|%s| in selector |%s|\n", index, argument, selector);
+                                    pushError(stack);
+                                }
+                                break;
+
+                            case "T":                   // Text - normal size
+                            case "t":                   // Text - smaller size (unimplemented)
+                                if (/^[\d ]?$/.test(argument)) {
+                                    pushText(stack, command, value, pickLevel(stack, command, argument, indent));
+                                } else {
+                                    console.error("lines[%d]: invalid argument=|%s| in selector |%s|\n", index, argument, selector);
+                                    pushError(stack);
+                                }
+                                break;
+
+                            case ">":                   // Relative right indent - argument is optional
+                            case "<":                   // Relative left indent - argument is optional
+                                if (/^[\d]$/.test(argument)) {
+                                    pushLevel(stack, command, pickLevel(stack, command, argument, indent));
+                                } else if (argument === "") {
+                                    pushLevel(stack, command, pickLevel(stack, command, 1, indent));
+                                } else {
+                                    console.error("lines[%d]: invalid argument=|%s| in selector |%s|\n", index, argument, selector);
+                                    pushError(stack);
+                                }
+                                break;
+
+                            case "=":                   // Absolute indent - argument is required
+                                if (/^[\d]$/.test(argument)) {
+                                    pushLevel(stack, command, pickLevel(stack, command, argument, indent));
+                                } else {
+                                    console.error("lines[%d]: invalid argument=|%s| in selector |%s|\n", index, argument, selector);
+                                    pushError(stack);
+                                }
+                                break;
+
+                            case "D":
+                                if (selector === "DUMP") {
+                                    //
+                                    // Some simple debugging.
+                                    //
+                                    switch (value) {
+                                        case "stack":
+                                            console.log("stack:", [...stack]);
+                                            break;
+
+                                        case "tabs":
+                                            console.log("tabs:", [...registered]);
+                                            break;
+                                    }
+                                } else {
+                                    console.error("lines[%d]: invalid argument=|%s| in selector |%s|\n", index, argument, selector);
+                                    pushError(stack);
+                                }
+                                break;
+
+                            case " ":                   // Ignored line or the content of a document comment
+                                //
+                                // Without a value it just adds visual vertical spacing to the lines
+                                // that we're processing. If there is a value it's assumed to be the
+                                // text (without delimiters) of a comment that will be added to the
+                                // document that will eventually be created.
+                                //
+                                if (/^[ ]?$/.test(argument)) {
+                                    if (value !== "") {
+                                        pushComment(stack, command, value, pickLevel(stack, command, argument, indent));
+                                    }
+                                } else {
+                                    console.error("lines[%d]: invalid argument |%s| - it must be empty or one space in a |%s| command.\n", index, argument, command);
+                                    pushError(stack);
+                                }
+                                break;
+
+                            case "#":                   // Comment - ignored
+                                //
+                                // Definitely not necessary because non-white characters (like #) that
+                                // precede the bracketed selector cause the entire line to be ignored.
+                                // Means "#" could be available for use as a real command - perhaps this
+                                // case should be removed.
+                                //
+                                break;
+
+                            default:
+                                console.error("lines[%d]: invalid command=|%s| in selector |%s|\n", index, command, selector);
+                                pushError(stack);
+                                break;
+                        }
+                    } else if (tokenizer_failed.exec(line) != null) {
+                        console.error("lines[%d]: line was skipped, probably because of an invalid whitespace character\n", index);
+                        pushError(stack);
+                    }
+                }
+
+                return(stack);
+            }
+
+            function pickLevel(stack, command, argument, indent = "") {
+                let level;
+
+                //
+                // Selects the next indentation level and returns it to the caller. Uses
+                // command to decide if argument represents an absolute or relative level
+                // and at the end makes sure a non-negative number is returned.
+                //
+                // NOTE - throws an exception if things don't look right because there's
+                // likely something inconsistent between the caller and this function.
+                //
+
+                level = stack.at(-1).level;
+
+                switch (command) {
+                    case " ":                   // current level is sufficient
+                        break;
+
+                    case ">":
+                    case "<":
+                        if (/^\d$/.test(argument)) {
+                            level += (command === ">" ? 1 : -1)*Number(argument);
+                        } else if (argument === "") {
+                            level += (command === ">" ? 1 : -1);
+                        } else {
+                            throw new Error(`internal error - unimplemented level argument ${argument} for command ${command}`);
+                        }
+                        break;
+
+                    default:
+                        if (argument === " ") {
+                            level = (indent.length > 0) ? Math.floor((indent.length - 1)/4) : stack.at(-1).level;
+                        } else if (argument === "") {
+                            level = (command === "^") ? 0 : stack.at(-1).level;
+                        } else if (/^\d$/.test(argument)) {
+                            level = Number(argument);
+                        } else {
+                            throw new Error(`internal error - unimplemented level argument ${argument} for command ${command}`);
+                        }
+                        break;
+                }
+                return(Math.max(level, 0));
+            }
+
+            function pushBreak(stack, command, level) {
+                //
+                // A simple helper function that pretty much only means callers won't have
+                // to duplicate whatever eventually ends up here. Right now it looks like
+                // overkill, but that could change.
+                //
+                // NOTE - a break that wasn't forced by an empty TEXT entry is represented
+                // by a NEWLINE element that has a value of 0. Otherwise a NEWLINE element's
+                // value will be a positive integer that eventually determines the number
+                // of consecutive "empty lines" that will be generated.
+                //
+
+                if (stack.at(-1).type === "TEXT") {
+                    stack.push({"type": "NEWLINE", "arg": command, "value": 0, "level": level});
+                }
+            }
+
+            function pushComment(stack, command, value, level) {
+                //
+                // Arguments list is only for consistency - value is the only one that's
+                // really used.
+                //
+
+                stack.push({"type": "COMMENT", "arg": command, "value": value, "level": level});
+            }
+
+            function pushError(stack) {
+                //
+                // This delays any exit so all of the mistakes can be written to the console.
+                // It also makes it easy for the caller function to decide what to do - the
+                // default behavior throws an error that terminates the application.
+                //
+
+                stack.push({"type": "ERROR"});
+            }
+
+            function pushHeading(stack, command, value, level) {
+                //
+                // Eventually there could be a flexible way to map the two single character
+                // heading commands directly to strings, like "H2" or "H3", that look more
+                // like HTML section heading elements. For now we'll just stick with upper
+                // and lower case words.
+                //
+                // NOTE - HTML section headings aren't currently allowed in strings we're
+                // parsing because each command is a single character and its argument, if
+                // there is one, is a character that adjusts the indentation level. Seems
+                // like a reasonable approach - for now anyway.
+                //
+
+                stack.push({"type": "HEADING", "arg": command, "value": value, "level": level});
+            }
+
+            function pushLevel(stack, command, level) {
+                //
+                // Handles explicit changes in the indentation level.
+                //
+
+                if (stack.at(-1).type === "LEVEL") {
+                    stack.at(-1).level = level;
+                    stack.at(-1).value += 1;
+                } else if (stack.at(-1).level !== level) {
+                    pushBreak(stack, command, level);
+                    stack.push({"type": "LEVEL", "arg": command, "value": 1, "level": level});
+                }
+            }
+
+            function pushTab(stack, command, value, level) {
+                //
+                // Removing NEWLINE elements right before pushing a TAB should be ok, but
+                // it isn't required or particularly important.
+                //
+                // NOTE - right now this is the only place the stack shrinks.
+                //
+
+                while (stack.at(-1).type === "NEWLINE") {
+                    stack.pop();
+                }
+
+                stack.push({"type": "TAB", "arg": command, "value": value, "level": level});
+            }
+
+            function pushText(stack, command, value, level) {
+                //
+                // All the hardcoded type strings should eventually be addressed. There are
+                // also other ways (besides using upper vs lower case) to distinguish them
+                // once they're added to the stack. Sufficient for now, since this is just
+                // an experiment.
+                //
+
+                if (value !== "") {
+                    if (stack.at(-1).type === "TEXT") {
+                        if (stack.at(-1).level !== level) {
+                            pushBreak(stack, command, level);
+                            stack.push({"type": "TEXT", "arg": command, "value": value, "level": level});
+                        } else {
+                            //
+                            // Right now this is a bit of a kludge that handles the "T" and "t"
+                            // commands the same way. It's an approach that will need attention
+                            // whenever their font size "hint" is implemented, however that will
+                            // undoubtedly have a much broader impact.
+                            //
+                            stack.at(-1).value += " " + value;
+                        }
+                    } else {
+                        //
+                        // Order of these two tests, along with the fact that stack started
+                        // with at least one element, means looking at the top two elements
+                        // without any other checks should be safe.
+                        //
+                        if (stack.at(-1).type === "NEWLINE" && stack.at(-2).type === "TEXT") {
+                            stack.at(-1).value += 1;
+                        }
+                        stack.push({"type": "TEXT", "arg": command, "value": value, "level": level});
+                    }
+                } else {
+                    if (stack.at(-1).type === "NEWLINE") {
+                        stack.at(-1).level = level;
+                        stack.at(-1).value += 1;
+                    } else {
+                        stack.push({"type": "NEWLINE", "arg": command, "value": 1, "level": level});
+                    }
+                }
+            }
+        </script>
+
+        <script type="module" data-name="Tabbed Help Panel Builder">
+            window.app = window.app || {};
+
+            //
+            // This is the application's help text. It's a single string that's eventually split
+            // into individual lines that are processed by the parseTabbedPanelLines() function.
+            // Leading white space on each line is ignored and valid lines are all supposed to
+            // start with a short prefix (called a selector) that tells parseTabbedPanelLines()
+            // what each line is supposed to represent.
+            //
+            // NOTE - the syntax that parseTabbedPanelLines() accepts and what it returns isn't
+            // currently documented, so if you're curious you'll have to look at the functions
+            // defined in the "Tabbed Panel Parser" module.
+            //
+
+            let TABBED_HELP_DESCRIPTION = `
+                [^ ] About
+                [T ]   What you get in this application is a boring look at a few billiard balls sitting on
+                [T ]   a flat green surface (that's supposed to represent a pool table) and some controls
+                [T ]   that let you modify what's displayed, move the balls up and down the table, or shift
+                [T ]   one of the balls slightly from left to right. It was designed to let you explore the
+                [T ]   pre-collision pool geometry in ways that might be difficult or impossible to do on a
+                [T ]   real pool table with opaque balls.
+                [T ]
+                [H ] Platforms
+                [T ]   It should run in most browsers, but it was written assuming a decent size screen and
+                [T ]   a mouse (with a wheel) were always available. For the best results, we recommend using
+                [T ]   a desktop or laptop with a mouse that has a wheel. A Bluetooth mouse connected to an
+                [T ]   iPad can be useful.
+                [T ]
+                [H ] History
+                [T ]   This application is based on a primitive Java 3D based program that I wrote in 2012.
+                [T ]   It was a clunky program that was written quickly (probably in a few weeks) and then
+                [T ]   abandoned for more than a decade. I handed that old program to Gemini 3.5 Flash in
+                [T ]   late May 2026 and then guided Gemini as it built an HTML, JavaScript, and Three.js
+                [T ]   version that ran in a browser. It worked, so I decided to host it using GitHub Pages,
+                [T ]   but the source code was messy and really hard to modify.
+                [T ]
+                [T ]   This is a cleaned up version of that HTML, JavaScript, and Three.js application. My
+                [T ]   goal was to end up with a single HTML file that JavaScript programmers could read,
+                [T ]   modify, and perhaps use as a working example of Three.js code. If you're interested
+                [T ]   in Three.js take a look at the source code when your browser runs this application
+                [T ]   or visit my public GitHub repository
+                [T ]
+                [T4]       https://github.com/rich-drechsler/shotview
+                [T ]
+                [T ]   and decide for yourself. This version of the application was a collaboration between
+                [T ]   me (Richard Drechsler) and Google Gemini 4 Argon.
+                [T ]
+                [^ ] Balls
+                [T ]   Two letter abbreviations shown in parentheses below are used to label some of the GUI
+                [T ]   components and may also be used elsewhere in this documentation. The colors assigned
+                [T ]   to these abbreviations also match the color of the balls displayed on the table.
+                [T ]
+                [H ]     Cue Ball (<span class="color-of-CB">CB</span>)
+                [T ]         The ball that moves along the Aim Line until it contacts the Object Ball, which
+                [T ]         happens when its center reaches the center of the Ghost Ball. It can be moved
+                [T ]         along the Aim Line using the CB Position slider or by dragging the ball up and
+                [T ]         down the table with the cursor.
+                [T ]
+                [H ]     Object Ball (<span class="color-of-OB">OB</span>)
+                [T ]         The ball that is contacted by the Cue Ball, which only happens when the center of
+                [T ]         the Cue Ball reaches the center of the Ghost Ball. The Object Ball can be moved
+                [T ]         along a line that's parallel to the Aim Line using the OB Position slider or it
+                [T ]         can be dragged up and down the table with the cursor.
+                [T ]
+                [T ]         The Object Ball and Ghost Ball are always in contact, so moving the Object Ball
+                [T ]         also moves the Ghost Ball. Their relative orientation can be adjusted using the
+                [T ]         Shot Angle slider or by moving the cursor left and right (i.e., horizontally)
+                [T ]         during a drag that starts with the SHIFT key pressed.
+                [T ]
+                [H ]     Ghost Ball (<span class="color-of-GB">GB</span>)
+                [T ]         An imaginary ball positioned on the Aim Line right next to the Object Ball. It's
+                [T ]         often used to explain aiming in pool, particularly to new players. The line that
+                [T ]         connects the center of the Ghost Ball to the center of the Object Ball determines
+                [T ]         where the Object Ball would go after a collision in this application's geometric
+                [T ]         world.
+                [T ]
+                [^ ] Checkboxes
+                [T ]   The checkboxes described below are grouped in the "Visual Aids" panel and used to toggle
+                [T ]   geometric aids that are displayed on the table. Colors used in some checkbox labels match
+                [T ]   the color of the visual aid that the checkbox controls.
+                [T ]
+                [H ]     Aim<span class="color-of-aim-line"> Line</span>
+                [T ]         Controls the visibility of the line that connects the center of the Cue Ball to the
+                [T ]         center of the Ghost Ball. Cue Ball movement up and down the table is always locked
+                [T ]         onto this line, whether it's visible or not.
+                [T ]
+                [T ]         The "Extended" checkbox, when selected, extends the ends of this line. It's an easy
+                [T ]         way to tell when the Aim Line intersects the Object Ball.
+                [T ]
+                [H ]     Contact<span class="color-of-contact-line"> Line</span>
+                [T ]         Controls the visibility of the line that connects the contact point on the Object
+                [T ]         Ball to the contact point on the Cue Ball. Those points coincide when the collision
+                [T ]         happens, so when you see the Contact Line and the Aim Line you know you're looking
+                [T ]         at parallel lines.
+                [T ]
+                [T ]         The "Extended" checkbox, when selected, extends the ends of this line so they're
+                [T ]         horizontally aligned with the ends of the Extended Aim Line.
+                [T ]
+                [H ]     Pocket<span class="color-of-pocket-line"> Line</span>
+                [T ]         Controls the visibility of the line that connects the center of the Ghost Ball to the
+                [T ]         center of the Object Ball. This line represents the direction the Object Ball travels
+                [T ]         after a collision with the Cue Ball. Both ends are always extended to make sure that
+                [T ]         direction is always visible, even when both balls are opaque.
+                [T ]
+                [T ]         The "Cloned" checkbox, when selected, draws a parallel copy of this line through the
+                [T ]         center of the Cue Ball.
+                [T ]
+                [H ]     Centers<span class="color-of-centers-box"> Box</span>
+                [T ]         Controls the visibility of a box (parallelogram) with vertices at the centers of the
+                [T ]         Cue Ball, Ghost Ball, and Object Ball. The sides of this box will always be parallel
+                [T ]         to the Aim Line and the Pocket Line.
+                [T ]
+                [H ]     Contact<span class="color-of-contact-caps"> Caps</span>
+                [T ]         A vertical plane containing the Contact Line splits the Cue Ball and Object Ball into
+                [T ]         matching pairs of larger and smaller spherical pieces. Selecting this checkbox paints
+                [T ]         the two smaller matching pieces.
+                [T ]
+                [^ ] Sliders
+                [T ]   All sliders respond to the mouse wheel, and the rotation direction moves all of them in the
+                [T ]   same direction. Slider titles with numeric values at their right margin respond to mouse wheel
+                [T ]   events that adjust their slider in discrete steps that are described below.
+                [T ]
+                [H ]     Shot Angle
+                [T ]         This slider adjusts the direction that the Object Ball would travel in a world with no
+                [T ]         complications (like friction) after a collision with the Cue Ball. It's the smaller of
+                [T ]         the two angles between the Pocket Line and the Extended Aim Line and the value of that
+                [T ]         angle is updated as the slider is adjusted.
+                [T ]
+                [T ]         Using the mouse wheel while the cursor is over the "Shot Angle" title steps the slider
+                [T ]         through preset angles (0°, 14°, 30°, 49°, and 90°) that correspond to traditional
+                [T ]         quarter-ball overlap fractions (full, 3/4, 1/2, 1/4, and edge).
+                [T ]
+                [H ]     Position
+                [T ]         A pair of sliders that you can use to move the Cue Ball and the Object Ball. Motion of
+                [T ]         either one stops when the Cue Ball and Ghost Ball share the same point as their center.
+                [T ]
+                [H ]     Transparency
+                [T ]         Sliders that let you adjust the transparency of the Cue Ball, Object Ball, and Ghost
+                [T ]         Ball. Initially the Cue Ball and Object Ball are opaque and the Ghost Ball is visible
+                [T ]         but mostly transparent.
+                [T ]
+                [H ]     Camera Height
+                [T ]         Adjusts the vertical distance (elevation) of the camera above the table. In the Top
+                [T ]         View, raising or lowering the camera changes how much of the table is visible. In the
+                [T ]         Player View, it adjusts your eye level above the cloth, simulating standing higher or
+                [T ]         getting your chin right down near the cue.
+                [T ]
+                [H ]     Camera Shift
+                [T ]         Shifts the Player View camera horizontally to the left or right across the line of aim
+                [T ]         without rotating the camera. This lets you inspect edge overlaps and simulate finding
+                [T ]         your vision center. This slider is disabled in the Top View.
+                [T ]
+                [T ]         Using the mouse wheel while the cursor is over the "Camera Shift" title steps the
+                [T ]         slider between three positions that align the camera with the Aim Line, the Contact
+                [T ]         Line, and the center of the Object Ball.
+                [T ]
+                [^ ] Views
+                [T ]   The available cameras provide the different views of the table that can be selected using
+                [T ]   the dropdown menu that's positioned in the center of the bottom bar. Each mouse wheel click,
+                [T ]   while the cursor hovers over that dropdown menu, changes the selected view. The Cue Ball and
+                [T ]   Object Ball can be dragged in every available view.
+                [T ]
+                [H ]     Top View
+                [T ]         A birds-eye view from directly above the table. The mouse wheel can be used to raise
+                [T ]         or lower the camera, matching the behavior of the Camera Height slider. In this view,
+                [T ]         the Camera Shift slider is disabled.
+                [T ]
+                [H ]     Player View
+                [T ]         A view from the player's perspective that by default looks down the line of the shot.
+                [T ]         The mouse wheel adjusts camera elevation, matching the behavior of the Camera Height
+                [T ]         slider. The Camera Shift slider is active in this view and allows subtle lateral
+                [T ]         adjustment across the shot line.
+                [T ]
+            `;
+
+            const CSS_GLOBALS = window.app.CSS_GLOBALS;
+
+            window.app.buildTabbedHelpPanel = () => {
+                let count;
+                let element;
+                let heading_color;
+                let heading_font_size_large;
+                let heading_font_size_small;
+                let heading_margin_bottom;
+                let help_panel_container;
+                let help_tab_container;
+                let index;
+                let level_indent;
+                let panel;
+                let panels;
+                let paragraph;
+                let splash_panel;
+                let stack;
+                let tab_button;
+                let tab_index;
+                let tabs;
+
+                //
+                // Hands the TABBED_HELP_DESCRIPTION string to parseTabbedPanelDescription() and
+                // then uses the array that's returned to build the help panel. Using a two step
+                // process simplifies this function, reduces the error checking that has to be
+                // done here, and means the parseTabbedPanelDescription() function could be used
+                // by other applications.
+                //
+
+                level_indent = CSS_GLOBALS["--help-level-indent"] || "20px";
+                heading_margin_bottom = CSS_GLOBALS["--help-heading-margin-bottom"] || "10px";
+                heading_color = CSS_GLOBALS["--help-heading-foreground-color"] || "red";
+                heading_font_size_large = CSS_GLOBALS["--help-font-size-title"] || "18px";
+                heading_font_size_small = CSS_GLOBALS["--help-font-size"] || "16px";
+
+                if (TABBED_HELP_DESCRIPTION != null) {
+                    if ((stack = window.app.parseTabbedPanelDescription(TABBED_HELP_DESCRIPTION)) != null) {
+                        help_tab_container = window.app.ID_TO_ELEMENT["help-tab-container"];
+                        help_panel_container = window.app.ID_TO_ELEMENT["help-panel-container"];
+
+                        //
+                        // We'll build these in the next loop and use them later when the click
+                        // event listeners for the tab buttons are built.
+                        //
+
+                        tabs = [];
+                        panels = [];
+
+                        //
+                        // We use splash_panel to collect any text that precedes the first tab.
+                        // Anything added to splash_panel will be displayed the first time the
+                        // help tabbed panel is displayed. It's primarily a defensive move and
+                        // doesn't really provide a new feature, because that same text could
+                        // be displayed using a tab.
+                        //
+
+                        splash_panel = document.createElement("div");
+                        panel = splash_panel;
+
+                        for (index = 0; index < stack.length; index++) {
+                            element = stack[index];
+                            switch (element.type) {
+                                case "COMMENT":
+                                    //
+                                    // The replace(/--/g, "- -") hack isn't foolproof, but it's
+                                    // sufficient for our purposes. Fix it if you disagree.
+                                    //
+                                    panel.appendChild(document.createComment(String(element.value).replace(/--/g, "- -")));
+                                    break;
+
+                                case "ERROR":
+                                    //
+                                    // parseTabbedPanelDescription() detected at least one error and
+                                    // wrote info about them to the console. This case gets to decide
+                                    // what happens and since it runs during initialization throwing
+                                    // an error should trigger the error handling that was installed
+                                    // by the "Startup Error Handling" module.
+                                    //
+                                    throw new Error();
+                                    break;
+
+                                case "FRAME":
+                                    //
+                                    // Currently ignored and element.value is empty, but it's not hard
+                                    // to imagine eventually doing something useful.
+                                    //
+                                    break;
+
+                                case "HEADING":
+                                    switch (element.arg) {
+                                        case "H":
+                                            panel.innerHTML += `<h3 style="font-size: ${heading_font_size_large}; margin-bottom: ${heading_margin_bottom}; color: ${heading_color};">${element.value}</h3>`;
+                                            break;
+
+                                        case "h":
+                                            panel.innerHTML += `<h4 style="font-size: ${heading_font_size_small}; margin-bottom: ${heading_margin_bottom}; color: ${heading_color};">${element.value}</h4>`;
+                                            break;
+
+                                        default:
+                                            throw new Error(`internal error - unimplemented heading argument ${element.arg}`);
+                                            break;
+                                    }
+                                    break;
+
+                                case "LEVEL":
+                                    //
+                                    // Nothing we need to do here. It's a record of a text indentation
+                                    // level change that the parser left on the stack. The parser could
+                                    // easily remove them as soon as the level is consumed by the next
+                                    // element or right after the parser's input ends. Leaving this in,
+                                    // for now anyway, means those changes can be implemented without
+                                    // affecting this function.
+                                    //
+                                    break;
+
+                                case "NEWLINE":
+                                    //
+                                    // When element.value is bigger than 1 this code adds breaks, as
+                                    // <br>, to generate an appropriate number of empty lines. If the
+                                    // case that handles "TEXT" uses <br> (rather than <p>) then this
+                                    // code probably needs to make sure
+                                    //
+                                    //     panel.innerHTML += "<br>";
+                                    //
+                                    // always happens at least once.
+                                    //
+                                    for (count = element.value; count > 1; count--) {
+                                        panel.innerHTML += "<br>";
+                                    }
+                                    break;
+
+                                case "TAB":
+                                    tab_index = tabs.length;
+                                    tab_button = document.createElement("button");
+                                    tab_button.className = (tab_index === 0) ? "help-tab-button active-tab" : "help-tab-button";
+                                    tab_button.innerText = element.value;
+                                    tab_button.setAttribute("data-tab-index", tab_index);
+                                    panel = document.createElement("div");
+                                    panel.className = (tab_index === 0) ? "help-tab-panel active-panel" : "help-tab-panel";
+
+                                    help_tab_container.appendChild(tab_button);
+                                    help_panel_container.appendChild(panel);
+
+                                    tabs.push(tab_button);
+                                    panels.push(panel);
+                                    break;
+
+                                case "TEXT":
+                                    paragraph = document.createElement("p");
+                                    paragraph.style.margin = "0px 10px";
+                                    paragraph.innerHTML = element.value;
+                                    if (element.level > 0) {
+                                        paragraph.style.marginLeft = `calc(${level_indent} * ${element.level})`;
+                                    }
+                                    panel.appendChild(paragraph);
+                                    break;
+
+                                default:
+                                    //
+                                    // Something's out of sync between parseTabbedPanelDescription() and
+                                    // this function, so quit to make sure the mismatch is noticed.
+                                    //
+                                    throw new Error(`internal error - missing case for ${element.type}`);
+                                    break;
+                            }
+                        }
+
+                        //
+                        // If there's anything in splash_panel make sure it's displayed the first
+                        // time the tabbed help panel is shown.
+                        //
+
+                        if (splash_panel.childNodes.length > 0) {
+                            tabs.forEach(t => t.classList.remove("active-tab"));
+                            panels.forEach(p => p.classList.remove("active-panel"));
+                            splash_panel.className = "help-tab-panel active-panel";
+                            help_panel_container.appendChild(splash_panel);
+                        } else {
+                            splash_panel = null;
+                        }
+
+                        //
+                        // Add click event listeners to each tab button.
+                        //
+
+                        tabs.forEach(tab => {
+                            tab.addEventListener("click", () => {
+                                if (splash_panel !== null) {
+                                    help_panel_container.removeChild(splash_panel);
+                                    splash_panel = null;
+                                }
+
+                                tabs.forEach(t => t.classList.remove("active-tab"));
+                                panels.forEach(p => p.classList.remove("active-panel"));
+
+                                tab.classList.add("active-tab");
+                                panels[tab.getAttribute("data-tab-index")].classList.add("active-panel");
+                            });
+                        });
+                    }
+                    TABBED_HELP_DESCRIPTION = null;           // won't need this again
+                }
+            }
+        </script>
+
+        <script type="module" data-name="Three.js Setup">
+            window.app = window.app || {};
+
+            //
+            // This module is responsible for configuring Three.js, which is a JavaScript
+            // library that can be used for 3D animation in a web browser. There's lots of
+            // documentation about it, but their official web site
+            //
+            //     https://threejs.org/
+            //
+            // is probably the best place to start if you're not familiar with Three.js.
+            //
+
+            const THREE = window.app.THREE;
+            const ID_TO_ELEMENT = window.app.ID_TO_ELEMENT;
+            const CSS_GLOBALS = window.app.CSS_GLOBALS;
+
+            //
+            // An initialization function.
+            //
+
+            window.app.assembleUniverse = (universe, animate, canvas_id) => {
+                let ball_diameter;
+                let ball_radius;
+                let table_length;
+                let table_width;
+                let view;
+
+                //
+                // Assembles the universe, which is something that's supposed to happen exactly
+                // once. Properties associated with the 3D scene (e.g., colors) were originally
+                // defined in :root (near the start of this file) and by the time this function
+                // runs they've also been copied into the JavaScript CSS_GLOBALS object.
+                //
+                // So the job here is straightforward, but definitely not trivial, particularly
+                // if you're not familiar with Three.js. It creates all of the 3D objects needed
+                // to display balls on the table, while making sure properties defined in :root
+                // are used to decide what those objects look like.
+                //
+                // Anything that will be needed elsewhere in this application is stored in the
+                // universe object that's passed in as the first argument. The animate argument
+                // must be a function that will be repeatedly called by the Three.js animation
+                // loop. The last argument is the id of the container Three.js will use when it
+                // renders each scene.
+                //
+
+                if (typeof universe === "object" && !Array.isArray(universe)) {
+                    if (typeof animate === "function") {
+                        if ((universe.container = ID_TO_ELEMENT[canvas_id]) != null) {
+                            if (!universe.assembled) {
+                                ball_radius = Number(CSS_GLOBALS["--three-ball-radius"]) || 1;
+                                ball_diameter = 2 * ball_radius;
+                                table_length = Number(CSS_GLOBALS["--three-table-length"]) || 32;
+                                table_width = Number(CSS_GLOBALS["--three-table-width"]) || 16;
+
+                                universe.ball_radius = ball_radius;
+                                universe.ball_diameter = ball_diameter;
+                                universe.table_length = table_length;
+                                universe.table_width = table_width;
+
+                                universe.renderer = new THREE.WebGLRenderer({antialias: true});
+                                universe.renderer.localClippingEnabled = true;
+                                universe.renderer.setAnimationLoop(animate);
+                                universe.container.appendChild(universe.renderer.domElement);
+
+                                universe.world_group = new THREE.Group();
+                                universe.scene = new THREE.Scene();
+                                universe.scene.add(universe.world_group);
+
+                                universe.table = new THREE.Mesh();
+                                universe.world_group.add(universe.table);
+                                universe.table.geometry = new THREE.PlaneGeometry(table_width, table_length);
+                                universe.table.material = new THREE.MeshBasicMaterial({color: CSS_GLOBALS["--three-table-color"]});
+
+                                universe.ambient_light = new THREE.AmbientLight();
+                                universe.ambient_light.color = new THREE.Color(CSS_GLOBALS["--three-ambient-light-color"]);
+                                universe.ambient_light.intensity = Number(CSS_GLOBALS["--three-ambient-light-intensity"]);
+                                universe.scene.add(universe.ambient_light);
+
+                                universe.overhead_light = new THREE.DirectionalLight();
+                                universe.overhead_light.color = new THREE.Color(CSS_GLOBALS["--three-overhead-light-color"]);
+                                universe.overhead_light.intensity = Number(CSS_GLOBALS["--three-overhead-light-intensity"]);
+                                universe.overhead_light.position.set(0.5*table_width, 0.5*table_length, 6.0);
+                                universe.scene.add(universe.overhead_light);
+
+                                universe.player_light = new THREE.DirectionalLight();
+                                universe.player_light.color = new THREE.Color(CSS_GLOBALS["--three-player-light-color"]);
+                                universe.player_light.intensity = Number(CSS_GLOBALS["--three-player-light-intensity"]);
+                                universe.player_light.position.set(0.5*table_width, -2.0, 3.0);
+                                universe.scene.add(universe.player_light);
+
+                                universe.ball_geometry = new THREE.SphereGeometry(ball_radius, 64, 64);
+
+                                universe.cue_ball_material = new THREE.MeshStandardMaterial({transparent: true, depthWrite: false});
+                                universe.cue_ball_material.color = new THREE.Color(CSS_GLOBALS["--three-cue-ball-color"]);
+                                universe.cue_ball_material.roughness = Number(CSS_GLOBALS["--three-cue-ball-roughness"]);
+                                universe.cue_ball_material.metalness = Number(CSS_GLOBALS["--three-cue-ball-metalness"]);
+                                universe.cue_ball = new THREE.Mesh(universe.ball_geometry, universe.cue_ball_material);
+                                universe.world_group.add(universe.cue_ball);
+
+                                universe.object_ball_material = new THREE.MeshStandardMaterial({transparent: true, depthWrite: false});
+                                universe.object_ball_material.color = new THREE.Color(CSS_GLOBALS["--three-object-ball-color"]);
+                                universe.object_ball_material.roughness = Number(CSS_GLOBALS["--three-object-ball-roughness"]);
+                                universe.object_ball_material.metalness = Number(CSS_GLOBALS["--three-object-ball-metalness"]);
+                                universe.object_ball = new THREE.Mesh(universe.ball_geometry, universe.object_ball_material);
+                                universe.world_group.add(universe.object_ball);
+
+                                universe.ghost_ball_material = new THREE.MeshStandardMaterial({transparent: true, depthWrite: false});
+                                universe.ghost_ball_material.color = new THREE.Color(CSS_GLOBALS["--three-ghost-ball-color"]);
+                                universe.ghost_ball_material.roughness = Number(CSS_GLOBALS["--three-ghost-ball-roughness"]);
+                                universe.ghost_ball_material.metalness = Number(CSS_GLOBALS["--three-ghost-ball-metalness"]);
+                                universe.ghost_ball = new THREE.Mesh(universe.ball_geometry, universe.ghost_ball_material);
+                                universe.world_group.add(universe.ghost_ball);
+
+                                universe.cb_cap_plane = new THREE.Plane(new THREE.Vector3(1, 0, 0), 0);
+                                universe.ob_cap_plane = new THREE.Plane(new THREE.Vector3(-1, 0, 0), 0);
+
+                                universe.contact_cap_material = new THREE.MeshStandardMaterial({
+                                    color: new THREE.Color(CSS_GLOBALS["--three-contact-caps-color"]),
+                                    roughness: Number(CSS_GLOBALS["--three-contact-caps-roughness"]),
+                                    metalness: Number(CSS_GLOBALS["--three-contact-caps-metalness"]),
+                                    transparent: false,
+                                    depthWrite: true,
+                                    side: THREE.DoubleSide,
+                                    polygonOffset: true,
+                                    polygonOffsetFactor: -1,
+                                    polygonOffsetUnits: -1,
+                                });
+
+                                universe.cb_cap_material = universe.contact_cap_material.clone();
+                                universe.cb_cap_material.clippingPlanes = [universe.cb_cap_plane];
+                                universe.cue_ball_cap = new THREE.Mesh(universe.ball_geometry, universe.cb_cap_material);
+                                universe.cue_ball.add(universe.cue_ball_cap);
+
+                                universe.ob_cap_material = universe.contact_cap_material.clone();
+                                universe.ob_cap_material.clippingPlanes = [universe.ob_cap_plane];
+                                universe.object_ball_cap = new THREE.Mesh(universe.ball_geometry, universe.ob_cap_material);
+                                universe.object_ball.add(universe.object_ball_cap);
+
+                                universe.aim_line_material = new THREE.LineBasicMaterial({color: CSS_GLOBALS["--three-aim-line-color"]});
+                                universe.aim_line = new THREE.Line(new THREE.BufferGeometry(), universe.aim_line_material);
+                                universe.aim_line.geometry.setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+                                universe.world_group.add(universe.aim_line);
+
+                                universe.centers_box_material = new THREE.LineBasicMaterial({color: CSS_GLOBALS["--three-centers-box-color"]});
+                                universe.centers_box = new THREE.Line(new THREE.BufferGeometry(), universe.centers_box_material);
+                                universe.centers_box.geometry.setFromPoints([
+                                    new THREE.Vector3(),
+                                    new THREE.Vector3(),
+                                    new THREE.Vector3(),
+                                    new THREE.Vector3(),
+                                    new THREE.Vector3(),
+                                ]);
+                                universe.world_group.add(universe.centers_box);
+
+                                universe.contact_line_material = new THREE.LineBasicMaterial({color: CSS_GLOBALS["--three-contact-line-color"]});
+                                universe.contact_line = new THREE.Line(new THREE.BufferGeometry(), universe.contact_line_material);
+                                universe.contact_line.geometry.setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+                                universe.world_group.add(universe.contact_line);
+
+                                universe.pocket_line_material = new THREE.LineBasicMaterial({color: CSS_GLOBALS["--three-pocket-line-color"]});
+                                universe.pocket_line = new THREE.Line(new THREE.BufferGeometry(), universe.pocket_line_material);
+                                universe.pocket_line.geometry.setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+                                universe.world_group.add(universe.pocket_line);
+
+                                universe.pocket_line_cloned = new THREE.Line(new THREE.BufferGeometry(), universe.pocket_line_material);
+                                universe.pocket_line_cloned.geometry.setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+                                universe.world_group.add(universe.pocket_line_cloned);
+
+                                universe.view_top_camera = new THREE.OrthographicCamera();
+                                universe.view_top_camera.near = 0.1;
+                                universe.view_top_camera.far = 10*ball_diameter;
+                                universe.view_top_camera.position.set(0, 0, 9*ball_diameter);
+
+                                universe.view_player_camera = new THREE.PerspectiveCamera();
+                                universe.view_player_camera.fov = 45;
+                                universe.view_player_camera.near = 0.05;
+                                universe.view_player_camera.far = 4*table_length;
+                                universe.view_player_camera.up.set(0, 0, 1);
+                                universe.view_player_camera.position.set(0, -table_length, 10*ball_radius);
+
+                                //
+                                // Stuff used to support ball selection and dragging in the canvas that
+                                // Three.js is using. They're all used by the universe.handleCanvasDrag()
+                                // method, which is defined in the "Main Module" (when THREE_UNIVERSE is
+                                // created).
+                                //
+
+                                universe.raycaster = new THREE.Raycaster();
+                                universe.drag_plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -ball_radius);
+                                universe.drag_point = new THREE.Vector3();
+                                universe.drag_ndc = new THREE.Vector2();
+
+                                universe.drag_state = {
+                                    active: false,
+                                    offset_x: 0,        // currently unused
+                                    offset_y: 0,
+                                    slider: null,
+                                    start_angle: 0,
+                                    start_x: 0,
+                                };
+
+                                //
+                                // Builds an object that maps view names to the camera slider names that
+                                // apply to each view. It's used to make sure camera sliders that don't
+                                // apply to the selected view are always hidden. It's not difficult and
+                                // having the universe.view_sliders object simplifies the code that runs
+                                // whenever the view changes.
+                                //
+
+                                universe.view_sliders = {};
+
+                                for (view of Array.from(ID_TO_ELEMENT["view-select"].options, option => option.value)) {
+                                    //
+                                    // First make sure a camera with the appropriate name exists.
+                                    //
+                                    if (universe.getCameraForView(view) != null) {
+                                        universe.view_sliders[view] = Object.keys(ID_TO_ELEMENT).filter(key => key.endsWith(`-slider-${view}`));
+                                        if (universe.view_sliders[view].length === 0) {
+                                            throw new Error(`no sliders are associated with view ${view}`);
+                                        }
+                                    } else {
+                                        throw new Error(`no camera is associated with view ${view}`);
+                                    }
+                                }
+
+                                universe.assembled = true;
+                            } else {
+                                throw new Error(`this universe has already been assembled`);
+                            }
+                            universe.syncUniverse();
+                        } else {
+                            throw new Error(`canvas element named ${canvas_id} doesn't exist`);
+                        }
+                    } else {
+                        throw new Error(`the animate argument must be a function`);
+                    }
+                } else {
+                    throw new Error(`the universe argument must be an object that maps strings to values`);
+                }
+            }
+        </script>
+
+        <script type="module" data-name="Main Module">
+            //
+            // A few convenient references - they've all been filled in by short scripts
+            // that have already run.
+            //
+
+            const THREE = window.app.THREE;
+            const ID_TO_ELEMENT = window.app.ID_TO_ELEMENT;
+            const CSS_GLOBALS = window.app.CSS_GLOBALS;
+
+            //
+            // ID_TO_EVENTS maps element ids, which must be defined in ID_TO_ELEMENT, to
+            // arguments that end up in one or more addEventListener() calls.
+            //
+
+            const ID_TO_EVENTS = {
+                "button-reset": ["click"],
+                "help-modal-open": ["click"],
+                "help-modal-close": ["click"],
+                "view-select": ["change", "wheel"],
+
+                // Checkboxes
+                "aim-line-checkbox": ["change"],
+                "aim-line-extended-checkbox": ["change"],
+                "centers-box-checkbox": ["change"],
+                "contact-caps-checkbox": ["change"],
+                "contact-line-checkbox": ["change"],
+                "contact-line-extended-checkbox": ["change"],
+                "pocket-line-checkbox": ["change"],
+                "pocket-line-cloned-checkbox": ["change"],
+
+                // Sliders & containers for wheel scrolling
+                "cb-position-slider": ["input"],
+                "cb-position-slider-box": ["wheel"],
+                "cb-transparency-slider": ["input"],
+                "cb-transparency-slider-box": ["wheel"],
+                "ob-position-slider": ["input"],
+                "ob-position-slider-box": ["wheel"],
+                "ob-transparency-slider": ["input"],
+                "ob-transparency-slider-box": ["wheel"],
+                "gb-transparency-slider": ["input"],
+                "gb-transparency-slider-box": ["wheel"],
+                "shift-slider-box": ["wheel"],
+                "shift-slider-title": ["wheel"],
+                "shift-slider-view-player": ["input"],
+                "shot-angle-slider": ["input"],
+                "shot-angle-slider-box": ["wheel"],
+                "shot-angle-slider-title": ["wheel"],
+                "height-slider-box": ["wheel"],
+                "height-slider-view-player": ["input"],
+                "height-slider-view-top": ["input"],
+
+                "canvas-panel": ["pointercancel", "pointerdown", "pointermove", "pointerup", "wheel"],
+
+                //
+                // A "reserved name" that's recognized by window.app.attachListenerToEvents()
+                // and is a way to attach listeners to the browser window.
+                //
+
+                "browser-window": ["resize"],
+            };
+
+            //
+            // THREE_UNIVERSE defines methods that manage the 3D scene and is populated by
+            // assembleUniverse() during initialization.
+            //
+
+            const THREE_UNIVERSE = {
+                assembled: false,
+
+                getCameraForView(name) {
+                    //
+                    // Translates a view name (e.g., "view-top") into the name of the property
+                    // in this object that holds the camera associated with that view. Returns
+                    // the camera or undefined if the camera doesn't exist.
+                    //
+
+                    return(this[name.replaceAll("-", "_") + "_camera"]);
+                },
+
+                handleCanvasDrag(event) {
+                    let angle_deg;
+                    let hits;
+                    let max_y;
+                    let min_y;
+                    let next_value;
+                    let ratio;
+                    let rect;
+                    let slider;
+                    let target_y;
+                    let updated;
+
+                    //
+                    // Handles pointer events on the canvas that select and drag the Cue Ball
+                    // or Object Ball. Rather than moving the balls directly, cursor motion is
+                    // used to adjust the value of the appropriate slider. If a slider's value
+                    // changes, that slider is returned so the caller can update the scene and
+                    // any label associated with the slider.
+                    //
+                    // NOTE - holding the SHIFT key when an Object Ball drag starts routes the
+                    // drag to shot-angle-slider instead of ob-position-slider.
+                    //
+
+                    updated = null;
+
+                    switch (event.type) {
+                        case "pointerdown":
+                            if (event.button === 0) {
+                                rect = this.container.getBoundingClientRect();
+                                this.drag_ndc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                                this.drag_ndc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+                                this.raycaster.setFromCamera(this.drag_ndc, this.selected_camera);
+                                hits = this.raycaster.intersectObjects([this.cue_ball, this.object_ball], false);
+
+                                if (hits.length > 0) {
+                                    if (this.raycaster.ray.intersectPlane(this.drag_plane, this.drag_point) != null) {
+                                        this.drag_state.active = true;
+                                        if (hits[0].object === this.cue_ball) {
+                                            this.drag_state.slider = ID_TO_ELEMENT["cb-position-slider"];
+                                            this.drag_state.offset_y = this.drag_point.y - this.cue_ball.position.y;
+                                        } else if (event.shiftKey) {
+                                            this.drag_state.slider = ID_TO_ELEMENT["shot-angle-slider"];
+                                            this.drag_state.start_x = event.clientX;
+                                            this.drag_state.start_angle = Number(this.drag_state.slider.value);
+                                        } else {
+                                            this.drag_state.slider = ID_TO_ELEMENT["ob-position-slider"];
+                                            this.drag_state.offset_y = this.drag_point.y - this.ghost_ball.position.y;
+                                        }
+                                        this.container.setPointerCapture(event.pointerId);
+                                    }
+                                }
+                            }
+                            break;
+
+                        case "pointermove":
+                            if (this.drag_state.active && (slider = this.drag_state.slider) != null) {
+                                if (slider.id === "shot-angle-slider") {
+                                    //
+                                    // Horizontal cursor motion adjusts the Shot Angle. Using pixel
+                                    // delta (or world X) works smoothly in both Top and Player views.
+                                    //
+                                    angle_deg = this.drag_state.start_angle + Math.round((event.clientX - this.drag_state.start_x) * 0.5);
+                                    next_value = Math.min(Math.max(angle_deg, Number(slider.min)), Number(slider.max));
+                                    if (Number(slider.value) !== next_value) {
+                                        slider.value = next_value;
+                                        updated = slider;
+                                    }
+                                } else {
+                                    rect = this.container.getBoundingClientRect();
+                                    this.drag_ndc.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                                    this.drag_ndc.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+                                    this.raycaster.setFromCamera(this.drag_ndc, this.selected_camera);
+                                    if (this.raycaster.ray.intersectPlane(this.drag_plane, this.drag_point) != null) {
+                                        min_y = -0.5 * this.table_length + 2 * this.ball_diameter;
+                                        max_y = 0.5 * this.table_length - 2 * this.ball_diameter;
+                                        target_y = this.drag_point.y - this.drag_state.offset_y;
+                                        ratio = (target_y - min_y) / (max_y - min_y);
+                                        next_value = Number(slider.min) + ratio * (Number(slider.max) - Number(slider.min));
+                                        next_value = Math.min(Math.max(next_value, Number(slider.min)), Number(slider.max));
+
+                                        if (Number(slider.value) !== next_value) {
+                                            slider.value = next_value;
+                                            updated = slider;
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+
+                        case "pointercancel":
+                        case "pointerup":
+                            if (this.drag_state.active) {
+                                this.drag_state.active = false;
+                                this.drag_state.slider = null;
+                                if (this.container.hasPointerCapture(event.pointerId)) {
+                                    this.container.releasePointerCapture(event.pointerId);
+                                }
+                            }
+                            break;
+                    }
+
+                    return(updated);
+                },
+
+                syncLines() {
+                    let aim_back_y;
+                    let aim_fwd_y;
+                    let angle_rad;
+                    let cb_y;
+                    let contact_back_y;
+                    let contact_fwd_y;
+                    let contact_x;
+                    let cos_a;
+                    let gb_y;
+                    let ob_x;
+                    let ob_y;
+                    let pocket_back;
+                    let pocket_fwd;
+                    let positions;
+                    let r;
+                    let shift_slider;
+                    let sign;
+                    let sin_a;
+
+                    //
+                    // Updates the geometry of the lines and box that can be displayed on the
+                    // table whenever a ball moves, the shot angle changes, or a checkbox that
+                    // affects line endpoints is toggled.
+                    //
+                    // NOTE - despite its name, this method also updates the clipping planes
+                    // used to render Contact Caps and the wheel stops for the Camera Shift
+                    // slider because they depend on the same geometric calculations.
+                    //
+
+                    r = this.ball_radius;
+                    cb_y = this.cue_ball.position.y;
+                    gb_y = this.ghost_ball.position.y;
+                    ob_x = this.object_ball.position.x;
+                    ob_y = this.object_ball.position.y;
+                    angle_rad = THREE.MathUtils.degToRad(Number(ID_TO_ELEMENT["shot-angle-slider"].value));
+                    sin_a = Math.sin(angle_rad);
+                    cos_a = Math.cos(angle_rad);
+
+                    //
+                    // Aim Line (and Extended option)
+                    //
+                    if (ID_TO_ELEMENT["aim-line-extended-checkbox"].checked) {
+                        aim_back_y = cb_y - r;
+                        aim_fwd_y = ob_y + r;
+                    } else {
+                        aim_back_y = cb_y;
+                        aim_fwd_y = gb_y;
+                    }
+                    positions = this.aim_line.geometry.attributes.position;
+                    positions.setXYZ(0, 0, aim_back_y, r);
+                    positions.setXYZ(1, 0, aim_fwd_y, r);
+                    positions.needsUpdate = true;
+
+                    //
+                    // Contact Line (and Extended option)
+                    //
+                    if (ID_TO_ELEMENT["contact-line-extended-checkbox"].checked) {
+                        contact_back_y = cb_y - r;
+                        contact_fwd_y = ob_y + r;
+                    } else {
+                        contact_back_y = cb_y + r * cos_a;
+                        contact_fwd_y = gb_y + r * cos_a;
+                    }
+                    contact_x = r * sin_a;
+                    positions = this.contact_line.geometry.attributes.position;
+                    positions.setXYZ(0, contact_x, contact_back_y, r);
+                    positions.setXYZ(1, contact_x, contact_fwd_y, r);
+                    positions.needsUpdate = true;
+
+                    //
+                    // Pocket Line and Cloned Pocket Line (1 diameter behind GB, 2 diameters past OB)
+                    //
+                    pocket_back = this.ball_diameter;
+                    pocket_fwd = 3 * this.ball_diameter;
+
+                    positions = this.pocket_line.geometry.attributes.position;
+                    positions.setXYZ(0, -pocket_back * sin_a, gb_y - pocket_back * cos_a, r);
+                    positions.setXYZ(1, pocket_fwd * sin_a, gb_y + pocket_fwd * cos_a, r);
+                    positions.needsUpdate = true;
+
+                    positions = this.pocket_line_cloned.geometry.attributes.position;
+                    positions.setXYZ(0, -pocket_back * sin_a, cb_y - pocket_back * cos_a, r);
+                    positions.setXYZ(1, pocket_fwd * sin_a, cb_y + pocket_fwd * cos_a, r);
+                    positions.needsUpdate = true;
+
+                    //
+                    // Parallelogram (GB -> OB -> Cloned corner -> CB, plus CB -> GB when Aim Line is hidden)
+                    //
+                    positions = this.centers_box.geometry.attributes.position;
+                    positions.setXYZ(0, 0, gb_y, r);
+                    positions.setXYZ(1, ob_x, ob_y, r);
+                    positions.setXYZ(2, ob_x, cb_y + this.ball_diameter * cos_a, r);
+                    positions.setXYZ(3, 0, cb_y, r);
+                    positions.setXYZ(4, 0, ID_TO_ELEMENT["aim-line-checkbox"].checked ? cb_y : gb_y, r);
+                    positions.needsUpdate = true;
+
+                    //
+                    // Contact Caps (world-space clipping planes along the Contact Line x = contact_x)
+                    //
+                    if (angle_rad !== 0) {
+                        sign = (angle_rad > 0) ? 1 : -1;
+                    } else {
+                        sign = this.cb_cap_plane.normal.x;
+                    }
+                    this.cb_cap_plane.normal.set(sign, 0, 0);
+                    this.cb_cap_plane.constant = -sign * contact_x;
+                    this.ob_cap_plane.normal.set(-sign, 0, 0);
+                    this.ob_cap_plane.constant = sign * contact_x;
+
+                    //
+                    // Camera Shift stops (Aim Line, Contact Line, Object Ball Center)
+                    //
+                    shift_slider = ID_TO_ELEMENT["shift-slider-view-player"];
+                    shift_slider._stops = [
+                        0,
+                        Math.round((contact_x / (Number(shift_slider._max_shift) * this.ball_diameter)) * Number(shift_slider.max)),
+                        Math.round((ob_x / (Number(shift_slider._max_shift) * this.ball_diameter)) * Number(shift_slider.max)),
+                    ].sort((a, b) => a - b);
+                },
+
+                syncUniverse() {
+                    //
+                    // Takes an "assembled" universe and makes sure the GUI's configuration is
+                    // completely aligned with the way the application is supposed to start.
+                    //
+
+                    if (this.assembled) {
+                        //
+                        // Order matters here - the container and ball positions must be synced
+                        // before controls that depend on them.
+                        //
+
+                        this.syncUniverseTo(this.container);
+                        this.syncUniverseTo(ID_TO_ELEMENT["ob-position-slider"]);
+                        this.syncUniverseTo(ID_TO_ELEMENT["cb-position-slider"]);
+
+                        this.syncUniverseTo(ID_TO_ELEMENT["cb-transparency-slider"]);
+                        this.syncUniverseTo(ID_TO_ELEMENT["ob-transparency-slider"]);
+                        this.syncUniverseTo(ID_TO_ELEMENT["gb-transparency-slider"]);
+                        this.syncUniverseTo(ID_TO_ELEMENT["shot-angle-slider"]);
+                        this.syncUniverseTo(ID_TO_ELEMENT["aim-line-checkbox"]);
+                        this.syncUniverseTo(ID_TO_ELEMENT["aim-line-extended-checkbox"]);
+                        this.syncUniverseTo(ID_TO_ELEMENT["centers-box-checkbox"]);
+                        this.syncUniverseTo(ID_TO_ELEMENT["contact-caps-checkbox"]);
+                        this.syncUniverseTo(ID_TO_ELEMENT["contact-line-checkbox"]);
+                        this.syncUniverseTo(ID_TO_ELEMENT["contact-line-extended-checkbox"]);
+                        this.syncUniverseTo(ID_TO_ELEMENT["pocket-line-checkbox"]);
+                        this.syncUniverseTo(ID_TO_ELEMENT["pocket-line-cloned-checkbox"]);
+                        this.syncUniverseTo(ID_TO_ELEMENT["height-slider-view-top"]);
+                        this.syncUniverseTo(ID_TO_ELEMENT["height-slider-view-player"]);
+                        this.syncUniverseTo(ID_TO_ELEMENT["shift-slider-view-player"]);
+                        this.syncUniverseTo(ID_TO_ELEMENT["view-select"]);
+                    } else {
+                        throw new Error(`the universe has not been assembled`);
+                    }
+                },
+
+                syncUniverseTo(target, event = null) {
+                    let angle_rad;
+                    let cb_slider;
+                    let cb_y;
+                    let container_aspect;
+                    let container_height;
+                    let container_width;
+                    let deltax;
+                    let deltay;
+                    let gb_y;
+                    let id;
+                    let max_y;
+                    let max_z;
+                    let min_y;
+                    let min_z;
+                    let ob_slider;
+                    let ob_x;
+                    let ob_y;
+                    let ratio;
+                    let shot_angle_slider;
+                    let table_aspect;
+                    let view;
+
+                    //
+                    // Updates the 3D scene to match the current state of target, which is an
+                    // element in ID_TO_ELEMENT (e.g., a slider, checkbox, or container). It's
+                    // called by syncUniverse() during initialization and reset, and whenever
+                    // eventListener() handles an event that affects the 3D scene.
+                    //
+                    // NOTE - even though the event argument is never used, there's at least
+                    // one call that supplies it as an argument. Decided to leave it in, for
+                    // now anyway, because there's a very small chance it could be useful.
+                    //
+
+                    switch (target.id) {
+                        case "aim-line-checkbox":
+                            this.aim_line.visible = target.checked;
+                            this.syncLines();
+                            break;
+
+                        case "aim-line-extended-checkbox":
+                        case "contact-line-extended-checkbox":
+                            this.syncLines();
+                            break;
+
+                        case "canvas-panel":
+                            container_width = target.clientWidth;
+                            container_height = target.clientHeight;
+                            container_aspect = container_width / container_height;
+                            table_aspect = this.table_width / this.table_length;
+
+                            this.renderer.setSize(container_width, container_height);
+
+                            deltax = 1.05 * ((container_aspect > table_aspect) ? this.table_length * container_aspect : this.table_width);
+                            deltay = deltax / container_aspect;
+
+                            this.view_top_camera.left = -deltax / 2;
+                            this.view_top_camera.right = deltax / 2;
+                            this.view_top_camera.top = deltay / 2;
+                            this.view_top_camera.bottom = -deltay / 2;
+                            this.view_top_camera.updateProjectionMatrix();
+
+                            this.view_player_camera.aspect = container_aspect;
+                            this.view_player_camera.updateProjectionMatrix();
+                            break;
+
+                        case "cb-position-slider":
+                            ob_slider = ID_TO_ELEMENT["ob-position-slider"];
+                            if (Number(target.value) > Number(ob_slider.value)) {
+                                target.value = ob_slider.value;
+                            }
+                            min_y = -0.5 * this.table_length + 2 * this.ball_diameter;
+                            max_y = 0.5 * this.table_length - 2 * this.ball_diameter;
+                            ratio = (Number(target.value) - Number(target.min)) / (Number(target.max) - Number(target.min));
+                            cb_y = min_y + ratio * (max_y - min_y);
+
+                            this.cue_ball.position.set(0, cb_y, this.ball_radius);
+                            this.syncLines();
+                            break;
+
+                        case "cb-transparency-slider":
+                        case "gb-transparency-slider":
+                        case "ob-transparency-slider":
+                            this[target._material_name].opacity = (target.max - target.value) / (target.max - target.min);
+                            break;
+
+                        case "centers-box-checkbox":
+                            this.centers_box.visible = target.checked;
+                            break;
+
+                        case "contact-caps-checkbox":
+                            this.cue_ball_cap.visible = target.checked;
+                            this.object_ball_cap.visible = target.checked;
+                            break;
+
+                        case "contact-line-checkbox":
+                            this.contact_line.visible = target.checked;
+                            break;
+
+                        case "height-slider-view-player":
+                            min_z = Number(target._min_z) * this.ball_radius;
+                            max_z = Number(target._max_z) * this.ball_radius;
+                            ratio = (Number(target.value) - Number(target.min)) / (Number(target.max) - Number(target.min));
+                            this.view_player_camera.position.z = min_z + ratio * (max_z - min_z);
+                            this.view_player_camera.lookAt(this.view_player_camera.position.x, this.ghost_ball.position.y, this.ball_radius);
+                            break;
+
+                        case "height-slider-view-top":
+                            min_z = Number(target._min_zoom);
+                            max_z = Number(target._max_zoom);
+                            ratio = (Number(target.value) - Number(target.min)) / (Number(target.max) - Number(target.min));
+                            this.view_top_camera.zoom = min_z * ((max_z / min_z) ** (1 - ratio));
+                            this.view_top_camera.updateProjectionMatrix();
+                            break;
+
+                        case "ob-position-slider":
+                            cb_slider = ID_TO_ELEMENT["cb-position-slider"];
+                            if (Number(target.value) < Number(cb_slider.value)) {
+                                target.value = cb_slider.value;
+                            }
+                            min_y = -0.5 * this.table_length + 2 * this.ball_diameter;
+                            max_y = 0.5 * this.table_length - 2 * this.ball_diameter;
+                            ratio = (Number(target.value) - Number(target.min)) / (Number(target.max) - Number(target.min));
+                            gb_y = min_y + ratio * (max_y - min_y);
+
+                            shot_angle_slider = ID_TO_ELEMENT["shot-angle-slider"];
+                            angle_rad = THREE.MathUtils.degToRad(Number(shot_angle_slider.value));
+                            ob_x = this.ball_diameter * Math.sin(angle_rad);
+                            ob_y = gb_y + this.ball_diameter * Math.cos(angle_rad);
+
+                            this.ghost_ball.position.set(0, gb_y, this.ball_radius);
+                            this.object_ball.position.set(ob_x, ob_y, this.ball_radius);
+                            this.view_player_camera.lookAt(this.view_player_camera.position.x, gb_y, this.ball_radius);
+                            this.syncLines();
+                            break;
+
+                        case "pocket-line-checkbox":
+                            this.pocket_line.visible = target.checked;
+                            break;
+
+                        case "pocket-line-cloned-checkbox":
+                            this.pocket_line_cloned.visible = target.checked;
+                            break;
+
+                        case "shift-slider-view-player":
+                            ratio = Number(target.value) / Number(target.max);
+                            this.view_player_camera.position.x = ratio * Number(target._max_shift) * this.ball_diameter;
+                            break;
+
+                        case "shot-angle-slider":
+                            angle_rad = THREE.MathUtils.degToRad(Number(target.value));
+                            gb_y = this.ghost_ball.position.y;
+                            ob_x = this.ball_diameter * Math.sin(angle_rad);
+                            ob_y = gb_y + this.ball_diameter * Math.cos(angle_rad);
+
+                            this.object_ball.position.set(ob_x, ob_y, this.ball_radius);
+                            this.syncLines();
+                            break;
+
+                        case "view-select":
+                            this.selected_view = target.value;
+                            this.selected_camera = this.getCameraForView(target.value);
+                            for (view of Object.keys(this.view_sliders)) {
+                                for (id of this.view_sliders[view]) {
+                                    ID_TO_ELEMENT[id].hidden = (view !== this.selected_view);
+                                }
+                            }
+                            break;
+
+                        default:
+                            console.error("target %o isn't recognized", target);
+                            break;
+                    }
+                },
+            };
+
+            //
+            // Module functions
+            //
+
+            function animate() {
+                //
+                // Handed to assembleUniverse() and registered as the Three.js animation loop
+                // callback, so it's called repeatedly by the browser to render the 3D scene
+                // using the currently selected camera.
+                //
+
+                THREE_UNIVERSE.renderer.render(THREE_UNIVERSE.scene, THREE_UNIVERSE.selected_camera);
+            }
+
+            function eventListener(event) {
+                let id;
+                let target;
+
+                //
+                // This is the function that's handed to window.app.attachListenerToEvents(),
+                // so all events in ID_TO_EVENTS are routed through this function.
+                //
+
+                if (event.cancelable) {
+                    event.preventDefault();
+                }
+
+                event.stopPropagation();
+                event.stopImmediatePropagation();
+
+                target = null;
+                id = event.currentTarget.id;
+
+                switch (id) {
+                    case "aim-line-checkbox":
+                    case "aim-line-extended-checkbox":
+                    case "centers-box-checkbox":
+                    case "contact-caps-checkbox":
+                    case "contact-line-checkbox":
+                    case "contact-line-extended-checkbox":
+                    case "pocket-line-checkbox":
+                    case "pocket-line-cloned-checkbox":
+                        if ((target = handleCheckboxEvent(event, id)) != null) {
+                            THREE_UNIVERSE.syncUniverseTo(target);
+                        }
+                        break;
+
+                    case "button-reset":
+                        initializeElements();
+                        break;
+
+                    case "canvas-panel":
+                        if (event.type === "wheel") {
+                            if ((target = handleSliderEvent(event, "height-slider-" + ID_TO_ELEMENT["view-select"].value)) != null) {
+                                THREE_UNIVERSE.syncUniverseTo(target);
+                            }
+                        } else if ((target = THREE_UNIVERSE.handleCanvasDrag(event)) != null) {
+                            THREE_UNIVERSE.syncUniverseTo(target);
+                            syncLabelTo(target);
+                        }
+                        break;
+
+                    case "height-slider-box":
+                    case "shift-slider-box":
+                    case "shift-slider-title":
+                        if ((target = handleSliderEvent(event, id.replace(/-(box|title)$/, "") + "-" + ID_TO_ELEMENT["view-select"].value)) != null) {
+                            THREE_UNIVERSE.syncUniverseTo(target);
+                        }
+                        break;
+
+                    case "help-modal-close":
+                        ID_TO_ELEMENT["help-modal"].classList.remove("modal-open");
+                        break;
+
+                    case "help-modal-open":
+                        ID_TO_ELEMENT["help-modal"].classList.add("modal-open");
+                        break;
+
+                    case "cb-position-slider":
+                    case "cb-position-slider-box":
+                    case "cb-transparency-slider":
+                    case "cb-transparency-slider-box":
+                    case "gb-transparency-slider":
+                    case "gb-transparency-slider-box":
+                    case "height-slider-view-top":
+                    case "height-slider-view-player":
+                    case "ob-position-slider":
+                    case "ob-position-slider-box":
+                    case "ob-transparency-slider":
+                    case "ob-transparency-slider-box":
+                    case "shift-slider-view-player":
+                    case "shot-angle-slider":
+                    case "shot-angle-slider-box":
+                    case "shot-angle-slider-title":
+                        if ((target = handleSliderEvent(event, id.replace(/-(box|title)$/, ""))) != null) {
+                            THREE_UNIVERSE.syncUniverseTo(target);
+                        }
+                        break;
+
+                    case "view-select":
+                        if ((target = handleSelectEvent(event, id)) != null) {
+                            THREE_UNIVERSE.syncUniverseTo(target);
+                        }
+                        break;
+
+                    default:
+                        if (event.currentTarget === window) {
+                            if ((target = handleWindowEvent(event)) != null) {
+                                THREE_UNIVERSE.syncUniverseTo(target, event);
+                            }
+                        } else {
+                            console.warn("**** Event %o has not been implemented\n", event);
+                        }
+                        break;
+                }
+            }
+
+            function handleCheckboxEvent(event, target_id) {
+                let target;
+                let updated;
+
+                //
+                // Handles events for the checkbox associated with target_id. If the checkbox
+                // isn't disabled and the event is recognized, any label associated with the
+                // checkbox is updated and the checkbox element is returned to the caller.
+                //
+                // NOTE - calling syncLabelTo() here is just for consistency with the other
+                // event handlers because checkboxes don't currently use labels that display
+                // their state.
+                //
+
+                updated = null;
+
+                if ((target = ID_TO_ELEMENT[target_id]) != null) {
+                    if (!target.disabled) {
+                        switch (event.type) {
+                            case "change":
+                                updated = target;
+                                break;
+
+                            default:
+                                throw new Error(`missing case for event type ${event.type}`);
+                                break;
+                        }
+                        syncLabelTo(updated);
+                    }
+                } else {
+                    throw new Error(`target id argument ${target_id} doesn't appear to be valid`);
+                }
+
+                return(updated);
+            }
+
+            function handleSelectEvent(event, target_id) {
+                let direction;
+                let index;
+                let length;
+                let target;
+                let updated;
+
+                //
+                // Handles events for the select element associated with target_id. Standard
+                // selection changes and mouse wheel rotation (which cycles through the menu
+                // options) are both supported. If the element isn't disabled and the event
+                // is recognized, any associated label is updated and the select element is
+                // returned to the caller.
+                //
+
+                updated = null;
+
+                if ((target = ID_TO_ELEMENT[target_id]) != null) {
+                    if (!target.disabled) {
+                        switch (event.type) {
+                            case "change":
+                                updated = target;
+                                break;
+
+                            case "wheel":
+                                length = target.options.length;
+                                index = target.selectedIndex;
+                                direction = (Math.sign(event.deltaY) < 0) ? 1 : -1;     // standardize scroll direction
+                                target.selectedIndex = (index + (direction < 0 ? length - 1 : 1)) % length;
+                                updated = target;
+                                break;
+
+                            default:
+                                throw new Error(`missing case for event type ${event.type}`);
+                                break;
+                        }
+                        syncLabelTo(updated);
+                    }
+                } else {
+                    throw new Error(`target id argument ${target_id} doesn't appear to be valid`);
+                }
+
+                return(updated);
+            }
+
+            function handleSliderEvent(event, target_id) {
+                let current_value;
+                let direction;
+                let max;
+                let min;
+                let next_value;
+                let step;
+                let stops;
+                let target;
+                let updated;
+
+                //
+                // Handles events for the slider associated with target_id. Standard slider
+                // adjustments and mouse wheel rotation are both supported. If the slider's
+                // value changes, any label associated with the slider is updated and the
+                // slider element is returned to the caller.
+                //
+                // NOTE - wheel events that fire on a slider's title element step through
+                // the preset values in target._stops (when defined) instead of using the
+                // slider's step attribute. If target._stops is a string (e.g., when it's
+                // initialized from :root), it's converted into a sorted array of numbers
+                // the first time it's used.
+                //
+
+                updated = null;
+
+                if ((target = ID_TO_ELEMENT[target_id]) != null) {
+                    if (!target.disabled) {
+                        switch (event.type) {
+                            case "change":
+                            case "input":
+                                updated = target;
+                                break;
+
+                            case "wheel":
+                                direction = (Math.sign(event.deltaY) < 0) ? 1 : -1;    // standardize scroll direction
+                                current_value = parseFloat(target.value);
+                                min = parseFloat(target.min);
+                                max = parseFloat(target.max);
+                                next_value = current_value;
+
+                                if (event.currentTarget.id.endsWith("-title") && target._stops != null) {
+                                    if (typeof target._stops === "string") {
+                                        target._stops = target._stops
+                                            .replace(/^["']|["']$/g, "")
+                                            .split(/[\s,]+/)
+                                            .filter(s => s !== "")
+                                            .map(Number)
+                                            .sort((a, b) => a - b);
+                                    }
+                                    stops = target._stops;
+                                    if (direction > 0) {
+                                        next_value = stops.find(s => s > current_value) ?? current_value;
+                                    } else {
+                                        next_value = stops.findLast(s => s < current_value) ?? current_value;
+                                    }
+                                    next_value = Math.min(Math.max(next_value, min), max);
+                                } else {
+                                    step = parseFloat(target.step) || 1;
+                                    next_value = Math.min(Math.max(current_value + (direction * step), min), max);
+                                }
+
+                                if (current_value !== next_value) {
+                                    target.value = next_value;
+                                    updated = target;
+                                }
+                                break;
+
+                            default:
+                                throw new Error(`missing case for event type ${event.type}`);
+                                break;
+                        }
+                        syncLabelTo(updated);
+                    }
+                } else {
+                    throw new Error(`target id argument ${target_id} doesn't appear to be valid`);
+                }
+
+                return(updated);
+            }
+
+            function handleWindowEvent(event) {
+                let updated;
+
+                //
+                // Very limited right now, but I suppose there's a chance we'll eventually do
+                // more here.
+                //
+
+                updated = null;
+
+                if (event.currentTarget === window) {
+                    switch (event.type) {
+                        case "resize":
+                            updated = ID_TO_ELEMENT["canvas-panel"];
+                            break;
+
+                        default:
+                            throw new Error(`missing case for window event type ${event.type}`);
+                            break;
+                    }
+                } else {
+                    console.error("event.currentTarget %o is not valid", event.currentTarget);
+                    throw new Error();
+                }
+
+                return(updated);
+            }
+
+            function initializeElements(validate = false) {
+                let attr;
+                let element;
+                let id;
+                let index;
+                let initialized;
+                let key;
+                let labeled;
+                let tokenizer;
+                let tokens;
+                let value;
+
+                //
+                // This function looks through CSS_GLOBALS, which must have already been built,
+                // to find all the properties (i.e., the ones that match the tokenizer regular
+                // expression) that are supposed to be set during initialization or after the
+                // Reset button is pressed. Right now the only ones we're looking for have keys
+                // that start with the prefix "--initial-" and include at least one underscore
+                // before the last character in the key.
+                //
+                // As an example, suppose one of the :root entries that ended up in CSS_GLOBALS
+                // looked like
+                //
+                //     --initial-an-element-id_qwert: 30;
+                //
+                // then after the tokenizer regex splits the key up into tokens "an-element-id"
+                // is assigned to id, "qwert" is assigned to attr, and "30" is assigned to value.
+                // After that, ID_TO_ELEMENT is used to map id to the targeted element and then
+                // value is assigned to that element's attr property. Now suppose the single
+                // underscore is replaced by two, as in
+                //
+                //     --initial-an-element-id__qwert: 30;
+                //
+                // then the first underscore is the separator, but the second one is included in
+                // the value assigned to attr, so "_qwert" is the name of the element's property
+                // that ends up being set to 30.
+                //
+                // NOTE - decided to make the tokenizer a bit more general than necessary, just
+                // so we can notice some obvious "mistakes" and put out a decent error message.
+                //
+
+                initialized = [];
+                labeled = {};
+                tokenizer = /^(--initial([^a-zA-Z0-9]))([a-zA-Z][a-zA-Z0-9-]*[a-zA-Z0-9])_([a-z_][a-zA-Z0-9_]+)$/;
+
+                for (key of Object.keys(CSS_GLOBALS)) {
+                    if ((tokens = tokenizer.exec(key)) != null) {
+                        if (tokens[2] === "-") {                // validate in first separator
+                            id = tokens[3];
+                            attr = tokens[4];
+                            if ((element = ID_TO_ELEMENT[id]) != null) {
+                                switch (CSS_GLOBALS[key]) {
+                                    case "false":
+                                        value = false;
+                                        break;
+
+                                    case "true":
+                                        value = true;
+                                        break;
+
+                                    default:
+                                        value = CSS_GLOBALS[key];
+                                        break;
+                                }
+                                element[attr] = value;
+                                if (attr === "_label_descriptor" || attr === "_label_id") {
+                                    //
+                                    // These are collected in labeled and eventually all of
+                                    // them will be synced to their labels.
+                                    //
+                                    if (labeled[id] == null) {
+                                        labeled[id] = element;
+                                    }
+                                }
+                                if (validate) {
+                                    initialized.push(element, attr, value);
+                                }
+                            } else {
+                                throw new Error(`key ${key} doesn't contain an id that's recognized`);
+                            }
+                        } else {
+                            throw new Error(`key ${key} starts with an invalid prefix ${tokens[1]}`);
+                        }
+                    }
+                }
+
+                if (validate) {                 // for emphasis - the test isn't necessary
+                    for (index = 0; index < initialized.length; index += 3) {
+                        element = initialized[index];
+                        attr = initialized[index+1];
+                        value = initialized[index+2];
+                        if (element[attr] !== value) {
+                            throw new Error(`initialization mismatch: ${element.id}[${attr}]=${element[attr]} (expected ${value})`);
+                        }
+                    }
+                }
+
+                //
+                // The elements in labeled are all supposed to be associated with a label
+                // and each one must have fields named _label_id and _label_descriptor. We
+                // make sure both exist before calling syncLabelTo(), because that function
+                // can be called with any element - not just the ones that are explicitly
+                // associated with a label.
+                //
+                // NOTE - syncLabelTo() does handle important error checking that we don't
+                // want to duplicate here (e.g., parsing whatever's in _label_descriptor).
+                //
+
+                for ([id, element] of Object.entries(labeled)) {
+                    if (element._label_id != null) {
+                        if (element._label_descriptor != null) {
+                            syncLabelTo(element);
+                        } else {
+                            console.error("required _label_descriptor field is missing in element %o", element);
+                            throw new Error();
+                        }
+                    } else {
+                        console.error("required _label_id field is missing in element %o", element);
+                        throw new Error();
+                    }
+                }
+
+                //
+                // If THREE_UNIVERSE has been assembled, which will happen after the Reset
+                // button is pressed, make sure the Three.js universe is configured.
+                //
+
+                if (THREE_UNIVERSE.assembled) {
+                    THREE_UNIVERSE.syncUniverse();
+                }
+            }
+
+            function run() {
+                //
+                // Called at the end of this module to initialize and start the application. It
+                // makes sure the objects built by earlier modules exist, calls the functions
+                // that finish initializing the application, and then calls afterInitialize()
+                // to remove the temporary error listener installed by the first module.
+                //
+                // NOTE - initializeElements() must run before assembleUniverse() is called so
+                // the GUI elements are configured when assembleUniverse() syncs the universe.
+                //
+
+                if (THREE != null) {
+                    if (ID_TO_ELEMENT != null) {
+                        if (CSS_GLOBALS != null) {
+                            initializeElements(true);
+
+                            window.app.attachListenerToEvents(eventListener, ID_TO_EVENTS);
+                            window.app.buildTabbedHelpPanel();
+                            window.app.assembleUniverse(THREE_UNIVERSE, animate, "canvas-panel");
+                            window.app.afterInitialize();
+                        } else {
+                            throw new Error("problem building CSS_GLOBALS - this is an unexpected error");
+                        }
+                    } else {
+                        throw new Error("problem building ID_TO_ELEMENT - check for duplicate element ids");
+                    }
+                } else {
+                    throw new Error("problem downloading Three.js - check your network connection or the module's integrity hash");
+                }
+            }
+
+            function syncLabelTo(owner) {
+                let builtin;
+                let descriptor;
+                let key;
+                let label;
+                let label_descriptor;
+                let label_id;
+                let label_text;
+                let str;
+                let tokenizer;
+                let tokens;
+
+                //
+                // Handles elements, like sliders, that are explicitly associated with a label
+                // that's supposed to display the element's current "value". Right now that only
+                // happens when the element has "_label_id" and "_label_descriptor" keys that
+                // were both created when initializeElements() was called the first time (i.e.,
+                // when the application started running).
+                //
+                // NOTE - the tokenizer regular expression seems to work, but it's brittle and
+                // the code that handles matched tokens assumes it knows their correct indices.
+                // Change that regular expression, even a little, and you'll probably have to
+                // take a close look at the code in the while loop.
+                //
+                // NOTE - plenty of room left for error checks, and because this function also
+                // runs during initialization any mistakes should be caught very early.
+                //
+
+                tokenizer = /^[ \t]*((["'])([\s\S]*)?\2|this[.]([A-Za-z0-9_]+)|([a-z]+)[\(]this[.]([A-Za-z0-9_]+)[\)])[ \t]*[+]?[ \t]*(.*)$/;
+
+                if (owner != null) {
+                    if ((label_id = owner._label_id) != null) {
+                        label_id = label_id.replace(/^["']|["']$/g, "").trim();
+                        if ((label = ID_TO_ELEMENT[label_id]) != null) {
+                            if ((label_descriptor = owner._label_descriptor) != null) {
+                                label_text = "";
+                                descriptor = label_descriptor.replace(/^["']|["']$/g, "").trim();
+                                while (descriptor != null && descriptor !== "") {
+                                    if ((tokens = tokenizer.exec(descriptor)) != null) {
+                                        if ((str = tokens[3]) != null) {
+                                            label_text += str;
+                                        } else if ((key = tokens[4]) != null) {
+                                            label_text += owner[key];           // handles "this.key"
+                                        } else if ((builtin = tokens[5]) != null) {
+                                            if ((key = tokens[6]) != null) {
+                                                //
+                                                // It's a builtin - the only one we currently need is abs(),
+                                                // but more could be added.
+                                                //
+                                                switch (builtin) {
+                                                    case "abs":
+                                                        if (owner[key] !== undefined) {
+                                                            label_text += Math.abs(Number(owner[key]));
+                                                        } else {
+                                                            console.error("key %s is not defined in owner %o", key, owner);
+                                                            throw new Error();
+                                                        }
+                                                        break;
+
+                                                    default:
+                                                        throw new Error(`builtin ${builtin} hasn't been implemented`);
+                                                        break;
+                                                }
+                                            } else {
+                                                throw new Error(`problem extracting the builtin's argument from ${label_descriptor}`);
+                                            }
+                                        } else {
+                                            throw new Error(`problem extracting tokens from the active descriptor ${descriptor}`);
+                                        }
+                                        descriptor = tokens[7];
+                                    } else {
+                                        console.error("problem parsing the active label descriptor %s for %o", descriptor, owner);
+                                        throw new Error();
+                                        descriptor = null;              // force loop to stop if the throw is removed
+                                    }
+                                }
+                                label.innerText = label_text;
+                            }
+                        } else {
+                            throw new Error(`label id ${label_id} isn't assigned to an existing element`);
+                        }
+                    }
+                }
+            }
+
+            //
+            // Script start
+            //
+
+            run();
+        </script>
+    </body>
+</html>
+

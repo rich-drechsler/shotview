@@ -1,0 +1,1499 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-9T4LFPJPH6"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'G-9T4LFPJPH6');
+    </script>
+    <title>Billiard Aiming 1.0</title>
+    <style>
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0; padding: 0; overflow: hidden;
+            background: #010201; color: #00ff41;
+            font-family: 'Consolas', monospace;
+            height: 100vh;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            grid-template-rows: calc(100vh - 50px) 50px;
+        }
+
+        /* --- LEFT SIDE CONTAINER --- */
+        #left-panel-stack {
+            grid-column: 1;
+            grid-row: 1;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            border-right: 2px solid #004400;
+            background: #000b00;
+            padding: 15px;
+            gap: 15px;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        /* --- RIGHT SIDE CANVAS CONTAINER --- */
+        #canvas-container {
+            grid-column: 2;
+            grid-row: 1;
+            height: 100%;
+            background: #000; position: relative; min-width: 0;
+            min-height: 0;
+        }
+        canvas { display: block; width: 100%; height: 100%; }
+
+        /* --- FULL-WIDTH BOTTOM BAR --- */
+        #master-footer-bar {
+            grid-column: 1 / span 2;
+            grid-row: 2;
+            background: #000b00;
+            border-top: 2px solid #004400;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 15px;
+            height: 100%;
+            z-index: 10;
+        }
+
+        .footer-segment {
+            display: flex;
+            align-items: center;
+        }
+
+        .segment-left { width: 290px; }
+        .segment-center { justify-content: center; flex-grow: 1; }
+
+        /* Sleek View Dropdown Custom Style */
+        #viewSelect {
+            background: #000;
+            color: #00ff41;
+            border: 1px solid #004400;
+            font-family: 'Consolas', monospace;
+            font-weight: bold;
+            font-size: 0.95em;
+            padding: 4px 8px;
+            outline: none;
+            cursor: pointer;
+        }
+        #viewSelect:hover, #viewSelect:focus {
+            border-color: #00ff41;
+        }
+
+        /* --- REFINED TABBED HELP OVERLAY --- */
+        #help-modal {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            background: rgba(0, 4, 0, 0.85);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding-top: 5vh;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.15s ease-in-out;
+        }
+
+        #help-modal.modal-open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #help-content {
+            background: #000500;
+            border: 1px solid #00ff41;
+            padding: 30px;
+            width: 800px;
+            max-width: 92vw;
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.15);
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Dynamic Tab Navigation Row Headers */
+        #help-tabs-header {
+            display: flex;
+            border-bottom: 1px solid #004400;
+            margin-bottom: 20px;
+            gap: 5px;
+            justify-content: space-between;
+        }
+
+        .tab-btn {
+            background: transparent;
+            color: #a0cca0;
+            border: 1px solid transparent;
+            border-bottom: none;
+            padding: 8px 12px;
+            font-family: 'Consolas', monospace;
+            font-weight: bold;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: all 0.1s ease;
+        }
+        .tab-btn:hover {
+            color: #00ff41;
+            background: #001100;
+        }
+        .tab-btn.active-tab {
+            color: #00ff41;
+            border-color: #004400;
+            background: #000b00;
+            position: relative;
+            top: 1px;
+            border-top: 2px solid #00ff41;
+        }
+
+        /* Container for Dynamic Tab Panels */
+        #help-panels-container {
+            width: 100%;
+        }
+
+        .tab-panel { display: none; }
+        .tab-panel.active-panel { display: block; }
+
+        /* --- STACKED BLOCK HELP STYLE --- */
+        .help-section-container {
+            text-align: left;
+            max-height: 60vh;
+            overflow-y: auto;
+            padding: 5px 0;
+        }
+
+        .help-term {
+            color: #ffffff;
+            font-weight: bold;
+            font-size: 0.95em;
+            margin-top: 15px;
+            margin-bottom: 4px;
+        }
+
+        .help-term:first-child {
+            margin-top: 0;
+        }
+
+        .help-desc {
+            color: #a0cca0;
+            font-size: 0.9em;
+            line-height: 1.5;
+            padding-left: 15px;
+            margin-bottom: 12px;
+        }
+
+        /* Full-width style for non-labeled sections like About */
+        .help-fullwidth {
+            color: #a0cca0;
+            font-size: 0.95em;
+            line-height: 1.6;
+            text-align: left;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .help-note {
+            color: #a0cca0;
+            font-size: 0.85em;
+            font-style: italic;
+            border-top: 1px dashed #003300;
+            padding-top: 10px;
+            margin-top: 15px;
+        }
+
+        .help-close-container {
+            margin-top: 25px;
+            border-top: 1px dashed #002200;
+            padding-top: 20px;
+        }
+
+        #btnCloseHelp {
+            background: transparent;
+            color: #00ff41;
+            border: 1px solid #00ff41;
+            padding: 6px 24px;
+            font-family: 'Consolas', monospace;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        #btnCloseHelp:hover {
+            background: #002200;
+            color: #ffffff;
+        }
+
+        /* --- CONTROLS SUB-PANELS --- */
+        .control-group {
+            border: 1px solid #004400; background: rgba(0, 10, 0, 0.4); padding: 12px; width: 100%;
+            flex-shrink: 0;
+        }
+        .group-title {
+            font-weight: bold; font-size: 0.85em; color: #ffffff;
+            margin-bottom: 10px; border-bottom: 1px dashed #004400; padding-bottom: 4px;
+        }
+        .row-item { display: flex; align-items: center; margin-bottom: 8px; font-size: 0.9em; white-space: nowrap; }
+        .row-item:last-child { margin-bottom: 0; }
+
+        input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: #00ff41;
+            flex-shrink: 0;
+        }
+
+        label { cursor: pointer; }
+
+        .slider-container { margin-bottom: 12px; font-size: 0.85em; }
+        .slider-container:last-child { margin-bottom: 0; }
+        .slider-label { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        input[type="range"] { width: 100%; accent-color: #00ff41; display: block; }
+
+        input[type="range"]:disabled { opacity: 0.25; accent-color: #004400; cursor: not-allowed; }
+        .disabled-label { color: #004400 !important; }
+
+        button {
+            background: #000; color: #00ff41; border: 1px solid #00ff41;
+            padding: 6px 14px; font-family: 'Consolas', monospace; font-weight: bold;
+            outline: none; cursor: pointer; display: inline-block;
+        }
+        button:hover { background: #001100; }
+    </style>
+</head>
+<body>
+
+    <div id="left-panel-stack">
+        <div class="control-group" id="visibility-master-box">
+            <div class="group-title">Visual Aids</div>
+            <div class="row-item"><input type="checkbox" id="showAim" checked> Center Line</div>
+            <div class="row-item" style="padding-left: 20px;"><input type="checkbox" id="extendAim"> <span style="font-size: 0.9em; opacity: 0.85;">Extended</span></div>
+            <div class="row-item"><input type="checkbox" id="showTarget" checked> Pocket Line</div>
+            <div class="row-item" style="padding-left: 20px;"><input type="checkbox" id="showCloned"> <span style="font-size: 0.9em; opacity: 0.85;">Cloned</span></div>
+            <div class="row-item"><input type="checkbox" id="showContact" checked> Contact Line</div>
+            <div class="row-item" style="padding-left: 20px;"><input type="checkbox" id="showCaps" checked> <span style="color:#ffaa00;">Caps</span></div>
+        </div>
+
+        <div class="control-group" id="rotation-slider-box">
+            <div class="group-title">Shot Angle</div>
+            <div class="slider-container">
+                <div class="slider-label" style="justify-content: flex-end;">
+                    <span id="sliderAngleLabel" style="color: #00ff41; font-weight: bold;">30°</span>
+                </div>
+                <input type="range" id="rotSlider" min="-90" max="90" value="30" step="1">
+            </div>
+        </div>
+
+        <div class="control-group" id="position-box">
+            <div class="group-title">Position</div>
+            <div class="slider-container" id="position-cb-box">
+                <div class="slider-label"><span>CB</span></div>
+                <input type="range" id="cbSlider" min="0" max="100" value="16" step="1">
+            </div>
+            <div class="slider-container" id="position-ob-box">
+                <div class="slider-label"><span>OB</span></div>
+                <input type="range" id="obSlider" min="0" max="100" value="53" step="1">
+            </div>
+        </div>
+
+        <div class="control-group" id="camera-box">
+            <div class="group-title">Camera</div>
+            <div class="slider-container" id="camera-height-box">
+                <div class="slider-label">
+                    <span>Down</span>
+                    <span></span>
+                    <span>Up</span>
+                </div>
+                <input type="range" id="camHeightSlider" min="45" max="500" value="90" step="1">
+            </div>
+            <div class="slider-container" id="camera-pan-box">
+                <div class="slider-label">
+                    <span id="lblCamPanLeft">Left</span>
+                    <span id="sliderPanLabel" style="color: #00ff41; font-weight: bold; font-size: 0.95em;">0</span>
+                    <span id="lblCamPanRight">Right</span>
+                </div>
+                <input type="range" id="camPanSlider" min="-100" max="100" value="0" step="1" disabled>
+            </div>
+        </div>
+
+        <div class="control-group" id="transparency-box">
+            <div class="group-title">Transparency</div>
+            <div class="slider-container" id="transparency-cb-box">
+                <div class="slider-label"><span>CB</span></div>
+                <input type="range" id="visibilityCb" min="0" max="10" value="0">
+            </div>
+            <div class="slider-container" id="transparency-ob-box">
+                <div class="slider-label"><span>OB</span></div>
+                <input type="range" id="visibilityOb" min="0" max="10" value="0">
+            </div>
+            <div class="slider-container" id="transparency-gb-box">
+                <div class="slider-label"><span>GB</span></div>
+                <input type="range" id="visibilityGb" min="0" max="10" value="6">
+            </div>
+        </div>
+    </div>
+
+    <div id="master-footer-bar">
+        <div class="footer-segment segment-left">
+            <button id="btnReset">Reset</button>
+        </div>
+
+        <div class="footer-segment segment-center">
+            <select id="viewSelect">
+                <option value="top">Top View</option>
+                <option value="aim">Aim View</option>
+            </select>
+        </div>
+
+        <div class="footer-segment segment-right">
+            <button id="btnHelp">Help</button>
+        </div>
+    </div>
+
+    <div id="help-modal">
+        <div id="help-content">
+            <div id="help-tabs-header"></div>
+            <div id="help-panels-container"></div>
+            <div class="help-close-container">
+                <button id="btnCloseHelp">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- UNIFIED PLAIN TEXT DOCUMENTATION REPOSITORY STRING ---
+        const helpTextSourceString = `
+[About]
+    What you get here is a boring look at a few billiard balls sitting on a flat green
+    surface (a pool table) along with some controls that let you modify what's displayed,
+    move the balls up and down the table, or shift one of the balls slightly from left to
+    right. Its only purpose is to let you visualize aspects of aiming in pool that might
+    be difficult or impossible to replicate on a real pool table with opaque balls.
+
+    This program is based on a primitive (J3D based) version that I wrote after I retired
+    from AT&T in 2012. I enjoy pool and programming, so at that time a 3D pool aiming demo
+    seemed like an interesting project. I got far enough with that clunky old program
+    to notice a few things that I believe helped me with aiming, but rather than sharing
+    my conclusions I thought a polished up browser-based implementation of that program
+    would be more valuable. That way you can run the program and make up your own mind.
+
+    This version was a collaboration between me (Richard Drechsler) and Google Gemini 3.5
+    Flash that was built using Three.js and an HTML5 Canvas.
+
+[Balls]
+Cue Ball (CB)
+    The <span style="color: #2244ff; font-weight: bold;">blue ball</span> that moves along
+    the Center Line until it collides with the Object Ball, which happens when its center
+    reaches the center of the Ghost Ball.
+
+    It can be moved along the Center Line using the CB Position slider or by dragging the
+    ball vertically with the cursor.
+
+Object Ball (OB)
+    The <span style="color: #cc2222; font-weight: bold;">red ball</span> that is hit by
+    the Cue Ball to determine the shot direction. Selecting the "Pocket Line" checkbox
+    draws a line that shows you that direction.
+
+    It can be moved parallel to the Center Line using the OB Position slider or by dragging
+    the ball vertically. Its placement relative to the Ghost Ball can be adjusted using
+    the "Shot Angle" slider or by horizontal motion of the cursor during a drag that began
+    with the SHIFT key pressed.
+
+Ghost Ball (GB)
+    The <span style="color: #aaaaaa; font-weight: bold;">gray ball</span> that's always
+    positioned on the Center Line next to the Object Ball. It's an imaginary ball that's
+    often used to explain aiming in pool, particularly to new players.
+
+    Movement constraints prevent the Cue Ball's center from advancing past the center
+    of the Ghost Ball.
+
+Note
+    Two letter abbreviations shown in parentheses above are used to label some of the
+    GUI components and are referenced throughout this documentation.
+
+[Lines]
+Center Line
+    The <span style="color: #ffffff; font-weight: bold;">white line</span> that connects
+    the center of the Cue Ball to the center of the Ghost Ball. Movement of the Cue Ball
+    up and down the table is locked onto this line.
+
+    Selecting the "Extended" checkbox extends both ends of this line, primarily to help
+    you notice when this line intersects the Object Ball.
+
+Contact Line
+    The <span style="color: #ffaa00; font-weight: bold;">orange line</span> that connects
+    the contact point on the Object Ball to the contact point on the Cue Ball. Those two
+    points coincide when the collision happens, so when you see the orange Contact Line
+    and the white Center Line you can be sure you're looking at parallel lines.
+
+    This line splits the Cue Ball and Object Ball into matching pairs of larger and smaller
+    spherical pieces. Selecting the "Caps" checkbox paints the two smaller matching pieces
+    orange.
+
+Pocket Line
+    The <span style="color: #00ff41; font-weight: bold;">green line</span> that connects
+    the center of the Ghost Ball to the center of the Object Ball. This line represents the
+    direction the Object Ball travels after a collision with the Cue Ball. Both ends of this
+    line are extended to make sure that direction is always visible.
+
+    Selecting the "Cloned" checkbox draws a parallel copy of this line through the center
+    of the Cue Ball.
+
+[Sliders]
+Shot Angle
+    This slider adjusts the direction that the Object Ball would travel in a world with no
+    complications (like friction) after a collision with the Cue Ball. It's visible as the
+    small angle between the Pocket Line and the Extended Center Line.
+
+Position
+    A pair of sliders that you can use to move the Cue Ball and the Object Ball. Motion of
+    either one stops when the Cue Ball and Ghost Ball share the same point as their center.
+
+Camera
+    A pair of sliders that you can use to move the two cameras. In the Top View moving the
+    camera Down or Up zooms in or out, while moving it Left or Right isn't allowed. In the
+    Aim View the camera gives you the player's perspective and both sliders are enabled.
+
+Transparency
+    Sliders that let you adjust the transparency of the Cue Ball, Object Ball, and Ghost
+    Ball. Initially the Cue Ball and Object Ball are opaque and the Ghost Ball is visible
+    but mostly transparent.
+
+Note
+    Sliders respond to the mouse wheel, and the rotation direction of the wheel moves all
+    of them in the same direction.
+
+[Views]
+Top View
+    A birds-eye view from directly above the table. The mouse wheel can be used to move the
+    camera up and down (relative to the table), exactly the way it's done using the Camera
+    slider. In this view the Left/Right Camera is disabled.
+
+    The Cue Ball and the Object Ball can be dragged up and down the table. The Shot Angle
+    can be adjusted by horizontal motion of the cursor during a drag of the Object Ball
+    that began with the SHIFT key pressed.
+
+Aim View
+    A view from the player's perspective that by default looks down the line of the shot.
+    The mouse wheel can be used to move the camera up and down (relative to the table),
+    exactly the way it's done using the Camera slider. In this view the Left/Right Camera
+    slider is active and can be used to make small horizontal adjustments to the position
+    of the camera.
+
+    The Cue Ball and the Object Ball can be dragged up and down the table. The Shot Angle
+    can be adjusted by horizontal motion of the cursor during a drag of the Object Ball
+    that began with the SHIFT key pressed.
+
+View Selector
+    The active view can be changed using the dropdown menu that's positioned in the center
+    of the bottom bar. Each mouse wheel click, while the cursor hovers over the dropdown
+    menu, flips the active view.
+
+[Issues]
+Platforms
+    This application runs in a browser, but it was written assuming a decent size screen
+    and a mouse (with a wheel) were always available. It uses your browser's User-Agent
+    string to identify platforms that might not work well, but it's a flawed test. For
+    the best results, use a desktop or laptop with a mouse that has a wheel.
+
+iPads
+    Even though there are issues, we decided not to reject iPads. You currently can't drag
+    the Cue Ball or the Object Ball, but all of the sliders in the left panel work.
+
+Aim View Drag
+    Right now, dragging the Object Ball in the Aim View doesn't work as well as we would
+    like. It's something that eventually may be addressed, but for now we recommend using
+    the OB Position slider if you want more predictable behavior.
+
+`;
+
+        const METERSPERFEET = 0.3048;
+
+        const BALL_DIAMETER = (5.0 / 12.0) * METERSPERFEET;
+        const BALL_RADIUS = BALL_DIAMETER / 2;
+        const TABLE_LENGTH = 10.0 * METERSPERFEET;
+        const TABLE_WIDTH = 5.0 * METERSPERFEET;
+
+        let currentView = 'top';
+        let currentStep = -30;
+
+        const cbMinY = (BALL_DIAMETER * 2);
+        const obMaxY = TABLE_LENGTH - (BALL_DIAMETER * 2);
+
+        const targetCbY = TABLE_LENGTH / 6.0;
+        const targetObY = TABLE_LENGTH / 2.0;
+
+        const initialCbPct = (targetCbY - cbMinY) / (obMaxY - cbMinY);
+        const initialObPct = (targetObY - cbMinY) / (obMaxY - cbMinY);
+
+        let cbSliderPct = initialCbPct;
+        let obSliderPct = initialObPct;
+
+        document.getElementById('cbSlider').value = Math.round(initialCbPct * 100);
+        document.getElementById('obSlider').value = Math.round(initialObPct * 100);
+
+        const container = document.getElementById('canvas-container');
+        const w = container.clientWidth;
+        const h = container.clientHeight;
+
+        const tableAspect = TABLE_WIDTH / TABLE_LENGTH;
+        const canvasAspect = w / h;
+        let idealWorldWidth;
+
+        if (canvasAspect > tableAspect) {
+            idealWorldWidth = TABLE_LENGTH * canvasAspect * 1.05;
+        } else {
+            idealWorldWidth = TABLE_WIDTH * 1.05;
+        }
+
+        const camHeightSlider = document.getElementById('camHeightSlider');
+        let topZoomFactor = idealWorldWidth / (12.0 * METERSPERFEET);
+
+        let storedTopSliderVal = Math.round(topZoomFactor * 150);
+        let storedAimSliderVal = 90;
+
+        if (currentView === 'top') {
+            camHeightSlider.min = 45;
+            camHeightSlider.value = storedTopSliderVal;
+        } else {
+            camHeightSlider.min = 16;
+            camHeightSlider.value = storedAimSliderVal;
+        }
+
+        let pivotAnchorY = obMaxY;
+        let cueBallY = cbMinY;
+
+        let aimHeightOffset = (storedAimSliderVal / 100) * (BALL_DIAMETER * 3);
+        let aimPanOffsetVal = 0.0;
+        let computedContactShiftPctVal = 0;
+
+        const scene = new THREE.Scene();
+
+        const cameraTop = new THREE.OrthographicCamera(
+            -idealWorldWidth / 2, idealWorldWidth / 2,
+            (idealWorldWidth * (h / w)) / 2, -(idealWorldWidth * (h / w)) / 2,
+            -50, 100
+        );
+        cameraTop.position.set(0, 0, 12 * METERSPERFEET);
+
+        const cameraAim = new THREE.PerspectiveCamera(45, w / h, 0.05, 50);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(w, h);
+        container.appendChild(renderer.domElement);
+
+        const worldGroup = new THREE.Group();
+        scene.add(worldGroup);
+
+        const table = new THREE.Mesh(new THREE.PlaneGeometry(TABLE_WIDTH, TABLE_LENGTH), new THREE.MeshBasicMaterial({ color: 0x0c6d37 }));
+        table.position.set(TABLE_WIDTH / 2, TABLE_LENGTH / 2, 0);
+        worldGroup.add(table);
+
+        const ballGeo = new THREE.SphereGeometry(BALL_RADIUS, 64, 64);
+
+        const matCB = new THREE.MeshStandardMaterial({ color: 0x2244ff, transparent: true, opacity: 1.0, roughness: 0.2, metalness: 0.1, depthWrite: false });
+        const matOB = new THREE.MeshStandardMaterial({ color: 0xcc2222, transparent: true, opacity: 1.0, roughness: 0.2, metalness: 0.1, depthWrite: false });
+        const matGB = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, transparent: true, opacity: 0.4, roughness: 0.5, metalness: 0.0, depthWrite: false });
+
+        const matCap = new THREE.MeshStandardMaterial({
+            color: 0xffaa00,
+            transparent: false,
+            roughness: 0.2,
+            metalness: 0.1,
+            depthWrite: true,
+            side: THREE.DoubleSide,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1
+        });
+
+        const ballCB = new THREE.Mesh(ballGeo, matCB);
+        const ballOB = new THREE.Mesh(ballGeo, matOB);
+        const ballGB = new THREE.Mesh(ballGeo, matGB);
+
+        ballGB.renderOrder = 1;
+        ballOB.renderOrder = 2;
+        ballCB.renderOrder = 3;
+
+        const cbMinYVal = cbMinY;
+        const obMaxYVal = obMaxY;
+
+        const capGroupCB = new THREE.Group();
+        const capGroupOB = new THREE.Group();
+
+        worldGroup.add(ballCB, ballGB, ballOB, capGroupCB, capGroupOB);
+
+        const ambientLight = new THREE.AmbientLight(0x999999);
+        scene.add(ambientLight);
+
+        const overheadLight = new THREE.DirectionalLight(0xffffff, 0.7);
+        overheadLight.position.set(0.5 * TABLE_WIDTH, 0.5 * TABLE_LENGTH, 6.0);
+        scene.add(overheadLight);
+
+        const playerStanceLight = new THREE.DirectionalLight(0xffffff, 0.4);
+        playerStanceLight.position.set(0.5 * TABLE_WIDTH, -2.0, 3.0);
+        scene.add(playerStanceLight);
+
+        function createLineMesh(colorHex, type = 'segments') {
+            const geom = new THREE.BufferGeometry();
+            const mat = new THREE.LineBasicMaterial({ color: colorHex });
+            return (type === 'segments') ? new THREE.LineSegments(geom, mat) : new THREE.Line(geom, mat);
+        }
+
+        const aimLine = createLineMesh(0xffffff, 'line');
+        const targetLines = createLineMesh(0x00ff00, 'line');
+        const contactLine = createLineMesh(0xffaa00, 'line');
+        const clonedLine = createLineMesh(0x00ff00, 'line');
+        worldGroup.add(aimLine, targetLines, contactLine, clonedLine);
+
+        targetLines.visible = document.getElementById('showTarget').checked;
+        clonedLine.visible = targetLines.visible && document.getElementById('showCloned').checked;
+        contactLine.visible = document.getElementById('showContact').checked;
+
+        function rebuildCapMesh(group, penetrationRatio, targetVector) {
+            while(group.children.length > 0) {
+                const obj = group.children[0];
+                obj.geometry.dispose();
+                group.remove(obj);
+            }
+
+            if (!document.getElementById('showCaps').checked || penetrationRatio >= 1.0) return;
+
+            const halfAngle = Math.acos(penetrationRatio);
+            const MathCapGeometry = new THREE.SphereGeometry(BALL_RADIUS * 1.005, 64, 16, 0, Math.PI * 2, 0, halfAngle);
+            const mesh = new THREE.Mesh(MathCapGeometry, matCap);
+
+            const targetNorm = targetVector.clone().normalize();
+            const upWorld = new THREE.Vector3(0, 0, 1);
+            const sliceTangent = new THREE.Vector3().crossVectors(targetNorm, upWorld).normalize();
+
+            const m = new THREE.Matrix4().makeBasis(sliceTangent, targetNorm, upWorld);
+            mesh.quaternion.setFromRotationMatrix(m);
+            group.add(mesh);
+        }
+
+        function updateGeometryAndTransforms() {
+            let proposedPivotAnchorY = cbMinY + obSliderPct * (obMaxY - cbMinY);
+            let proposedCueBallY = cbMinY + cbSliderPct * (obMaxY - cbMinY);
+
+            const rads = THREE.MathUtils.degToRad(currentStep + 90);
+            const pathDir = new THREE.Vector3(Math.cos(rads), Math.sin(rads), 0).normalize();
+
+            const tempGbY = proposedPivotAnchorY;
+            const tempObX = (0.5 * TABLE_WIDTH) + pathDir.x * BALL_DIAMETER;
+            const tempObY = tempGbY + pathDir.y * BALL_DIAMETER;
+
+            const cbX = 0.5 * TABLE_WIDTH;
+            const dx = cbX - tempObX;
+
+            const separationDistance = BALL_DIAMETER;
+            const collisionThreshold = separationDistance + 0.00001;
+
+            if (Math.abs(dx) <= collisionThreshold) {
+                const radClipped = separationDistance * separationDistance - dx * dx;
+                const verticalGap = radClipped > 0 ? Math.sqrt(radClipped) : 0;
+                const maxVerticalHeight = tempObY - verticalGap;
+
+                if (proposedCueBallY > maxVerticalHeight) {
+                    if (window.lastInteractedSlider === 'obSlider') {
+                        proposedPivotAnchorY = proposedCueBallY + verticalGap - pathDir.y * BALL_DIAMETER;
+                        if (Math.abs(currentStep) === 90 && proposedPivotAnchorY < proposedCueBallY) {
+                            proposedPivotAnchorY = proposedCueBallY;
+                        }
+                    } else {
+                        proposedCueBallY = maxVerticalHeight;
+                    }
+                }
+            }
+
+            pivotAnchorY = proposedPivotAnchorY;
+            cueBallY = proposedCueBallY;
+
+            ballGB.position.set(0.5 * TABLE_WIDTH, pivotAnchorY, BALL_RADIUS);
+            ballOB.position.copy(ballGB.position).addScaledVector(pathDir, BALL_DIAMETER);
+            ballOB.position.z = BALL_RADIUS;
+            ballCB.position.set(0.5 * TABLE_WIDTH, cueBallY, BALL_RADIUS);
+
+            capGroupCB.position.copy(ballCB.position);
+            capGroupOB.position.copy(ballOB.position);
+
+            const lineZ = BALL_RADIUS;
+            const deltaX = ballOB.position.x - ballGB.position.x;
+
+            if (ballOB.position.y !== ballCB.position.y || Math.abs(currentStep) === 90) {
+
+                if (Math.abs(deltaX) < 0.00001 && Math.abs(currentStep) === 90) {
+                    const offsetSide = ballOB.position.x >= ballGB.position.x ? 1 : -1;
+
+                    const pCB_center = new THREE.Vector3(0.5 * TABLE_WIDTH, pivotAnchorY, lineZ);
+                    const pOB_center = new THREE.Vector3(ballOB.position.x, pivotAnchorY, lineZ);
+                    contactLine.geometry.setFromPoints([pCB_center, pOB_center]);
+
+                    const p1_flat = new THREE.Vector3(0.5 * TABLE_WIDTH, pivotAnchorY + BALL_DIAMETER, lineZ);
+                    const p2_flat = new THREE.Vector3(0.5 * TABLE_WIDTH, pivotAnchorY - BALL_DIAMETER * 3, lineZ);
+                    targetLines.geometry.setFromPoints([p1_flat, p2_flat]);
+
+                    const para1_flat = new THREE.Vector3(0.5 * TABLE_WIDTH, cueBallY + BALL_DIAMETER, lineZ);
+                    const para2_flat = new THREE.Vector3(0.5 * TABLE_WIDTH, cueBallY - BALL_DIAMETER * 3, lineZ);
+                    clonedLine.geometry.setFromPoints([para1_flat, para2_flat]);
+
+                    let aimLineStart, aimLineEnd;
+                    if (document.getElementById('extendAim').checked) {
+                        aimLineStart = new THREE.Vector3(0.5 * TABLE_WIDTH, cueBallY - BALL_RADIUS, lineZ);
+                        aimLineEnd = new THREE.Vector3(0.5 * TABLE_WIDTH, pOB_center.y, lineZ);
+                    } else {
+                        aimLineStart = new THREE.Vector3(0.5 * TABLE_WIDTH, cueBallY, lineZ);
+                        aimLineEnd = new THREE.Vector3(0.5 * TABLE_WIDTH, pivotAnchorY, lineZ);
+                    }
+                    aimLine.geometry.setFromPoints([aimLineStart, aimLineEnd]);
+
+                    const verticalDistance = Math.abs(cueBallY - pivotAnchorY);
+                    let ratio_flat = verticalDistance / BALL_DIAMETER;
+                    if (ratio_flat > 1.0) ratio_flat = 1.0;
+
+                    const capVectorCB_flat = new THREE.Vector3(offsetSide * BALL_RADIUS, 0, 0);
+                    const capVectorOB_flat = new THREE.Vector3(-offsetSide * BALL_RADIUS, 0, 0);
+
+                    rebuildCapMesh(capGroupCB, ratio_flat, capVectorCB_flat);
+                    rebuildCapMesh(capGroupOB, ratio_flat, capVectorOB_flat);
+
+                    computedContactShiftPctVal = Math.round(((pCB_center.x - (0.5 * TABLE_WIDTH)) / BALL_DIAMETER) * 100);
+
+                } else {
+                    let dynamicDeltaX = deltaX;
+                    if (Math.abs(dynamicDeltaX) < 0.00001) {
+                        dynamicDeltaX = dynamicDeltaX >= 0 ? 0.00001 : -0.00001;
+                    }
+
+                    const slope = (ballOB.position.y - ballGB.position.y) / dynamicDeltaX;
+                    const factor = (ballOB.position.x >= ballGB.position.x ? 1 : -1) / Math.sqrt(1 + slope * slope);
+
+                    const p1 = new THREE.Vector3(ballGB.position.x + signCheck(ballOB.position.x, ballGB.position.x) * BALL_DIAMETER * (1 / Math.sqrt(1 + slope * slope)), ballGB.position.y + signCheck(ballOB.position.x, ballGB.position.x) * BALL_DIAMETER * slope * (1 / Math.sqrt(1 + slope * slope)), lineZ);
+                    const p2 = new THREE.Vector3(ballGB.position.x - signCheck(ballOB.position.x, ballGB.position.x) * 3 * BALL_DIAMETER * (1 / Math.sqrt(1 + slope * slope)), ballGB.position.y - signCheck(ballOB.position.x, ballGB.position.x) * 3 * BALL_DIAMETER * slope * (1 / Math.sqrt(1 + slope * slope)), lineZ);
+                    targetLines.geometry.setFromPoints([p1, p2]);
+
+                    const para1 = new THREE.Vector3(ballCB.position.x + signCheck(ballOB.position.x, ballGB.position.x) * BALL_DIAMETER * (1 / Math.sqrt(1 + slope * slope)), ballCB.position.y + signCheck(ballOB.position.x, ballGB.position.x) * BALL_DIAMETER * slope * (1 / Math.sqrt(1 + slope * slope)), lineZ);
+                    const para2 = new THREE.Vector3(ballCB.position.x - signCheck(ballOB.position.x, ballGB.position.x) * 3 * BALL_DIAMETER * (1 / Math.sqrt(1 + slope * slope)), ballCB.position.y - signCheck(ballOB.position.x, ballGB.position.x) * 3 * BALL_DIAMETER * slope * (1 / Math.sqrt(1 + slope * slope)), lineZ);
+                    clonedLine.geometry.setFromPoints([para1, para2]);
+
+                    const pCB = new THREE.Vector3(ballCB.position.x + BALL_RADIUS * factor, ballCB.position.y - BALL_RADIUS, lineZ);
+                    const pOB = new THREE.Vector3(ballOB.position.x - BALL_RADIUS * factor, ballOB.position.y + BALL_RADIUS, lineZ);
+                    contactLine.geometry.setFromPoints([pCB, pOB]);
+
+                    let aimLineStart, aimLineEnd;
+                    if (document.getElementById('extendAim').checked) {
+                        aimLineStart = new THREE.Vector3(0.5 * TABLE_WIDTH, cueBallY - BALL_RADIUS, lineZ);
+
+                        let trueAimDir = new THREE.Vector3().subVectors(ballGB.position, ballCB.position);
+                        if (trueAimDir.lengthSq() < 0.000001) {
+                            const pOB_y_fallback = ballOB.position.y + BALL_RADIUS;
+                            aimLineEnd = new THREE.Vector3(0.5 * TABLE_WIDTH, pOB_y_fallback, lineZ);
+                        } else {
+                            trueAimDir.normalize();
+                            if (Math.abs(trueAimDir.y) > 0.00001) {
+                                const targetYHorizon = pOB.y;
+                                const verticalDistanceToPlane = targetYHorizon - cueBallY;
+                                const scaleFactor = verticalDistanceToPlane / trueAimDir.y;
+                                aimLineEnd = new THREE.Vector3(
+                                    0.5 * TABLE_WIDTH + trueAimDir.x * scaleFactor,
+                                    targetYHorizon,
+                                    lineZ
+                                );
+                            } else {
+                                aimLineEnd = new THREE.Vector3(ballGB.position.x, pivotAnchorY, lineZ);
+                            }
+                        }
+                    } else {
+                        aimLineStart = new THREE.Vector3(0.5 * TABLE_WIDTH, cueBallY, lineZ);
+                        aimLineEnd = new THREE.Vector3(0.5 * TABLE_WIDTH, pivotAnchorY, lineZ);
+                    }
+                    aimLine.geometry.setFromPoints([aimLineStart, aimLineEnd]);
+
+                    const lineDir = new THREE.Vector3().subVectors(pOB, pCB);
+                    const lineLengthSq = lineDir.lengthSq() || 0.0001;
+
+                    const toCB = new THREE.Vector3().subVectors(ballCB.position, pCB);
+                    const dotCB = toCB.dot(lineDir) / lineLengthSq;
+                    const chordMidpointCB = new THREE.Vector3().copy(pCB).addScaledVector(lineDir, dotCB);
+                    const MathCapVectorCB = new THREE.Vector3().subVectors(chordMidpointCB, ballCB.position);
+                    const distToCB = MathCapVectorCB.length() / BALL_RADIUS;
+
+                    const toOB = new THREE.Vector3().subVectors(ballOB.position, pCB);
+                    const dotOB = toOB.dot(lineDir) / lineLengthSq;
+                    const chordMidpointOB = new THREE.Vector3().copy(pCB).addScaledVector(lineDir, dotOB);
+                    const MathCapVectorOB = new THREE.Vector3().subVectors(chordMidpointOB, ballOB.position);
+                    const distToOB = MathCapVectorOB.length() / BALL_RADIUS;
+
+                    rebuildCapMesh(capGroupCB, Math.min(1.0, distToCB), MathCapVectorCB);
+                    rebuildCapMesh(capGroupOB, Math.min(1.0, distToOB), MathCapVectorOB);
+
+                    computedContactShiftPctVal = Math.round(((pCB.x - (0.5 * TABLE_WIDTH)) / BALL_DIAMETER) * 100);
+                }
+
+                targetLines.geometry.attributes.position.needsUpdate = true;
+                clonedLine.geometry.attributes.position.needsUpdate = true;
+                contactLine.geometry.attributes.position.needsUpdate = true;
+            }
+
+            const currentW = container.clientWidth;
+            const currentH = container.clientHeight;
+            renderer.setSize(currentW, currentH);
+
+            const sliderPan = document.getElementById('camPanSlider');
+
+            if (currentView === 'top') {
+                sliderPan.disabled = true;
+                document.getElementById('lblCamPanLeft').classList.add('disabled-label');
+                document.getElementById('lblCamPanRight').classList.add('disabled-label');
+                document.getElementById('sliderPanLabel').style.visibility = 'hidden';
+
+                topZoomFactor = storedTopSliderVal / 150;
+                const desiredWorldWidth = (12.0 * METERSPERFEET) * (topZoomFactor);
+                const desiredWorldWidthHeight = desiredWorldWidth * (currentH / currentW);
+                cameraTop.left = -desiredWorldWidth / 2; cameraTop.right = desiredWorldWidth / 2;
+                cameraTop.top = desiredWorldWidthHeight / 2; cameraTop.bottom = -desiredWorldWidthHeight / 2;
+                cameraTop.updateProjectionMatrix();
+
+                worldGroup.position.set(-TABLE_WIDTH / 2, -TABLE_LENGTH / 2, 0);
+                worldGroup.rotation.set(0, 0, 0);
+                worldGroup.updateMatrix();
+
+            } else if (currentView === 'aim') {
+                sliderPan.disabled = false;
+                document.getElementById('lblCamPanLeft').classList.remove('disabled-label');
+                document.getElementById('lblCamPanRight').classList.remove('disabled-label');
+                document.getElementById('sliderPanLabel').style.visibility = 'visible';
+
+                if (storedAimSliderVal <= 16) {
+                    aimHeightOffset = BALL_RADIUS;
+                } else {
+                    aimHeightOffset = (storedAimSliderVal / 100) * (BALL_DIAMETER * 3);
+                }
+
+                cameraAim.aspect = currentW / currentH;
+                cameraAim.updateProjectionMatrix();
+
+                worldGroup.position.set(0, 0, 0);
+                worldGroup.rotation.set(0, 0, 0);
+                worldGroup.updateMatrix();
+
+                cameraAim.up.set(0, 0, 1);
+
+                const rightVector = new THREE.Vector3(1, 0, 0);
+                const baseCamX = 0.5 * TABLE_WIDTH;
+                const baseCamY = -1.5 * METERSPERFEET;
+                const lateralDistanceShift = (aimPanOffsetVal / 100) * BALL_DIAMETER;
+
+                cameraAim.position.set(
+                    baseCamX + rightVector.x * lateralDistanceShift,
+                    baseCamY + rightVector.y * lateralDistanceShift,
+                    aimHeightOffset
+                );
+                cameraAim.lookAt(0.5 * TABLE_WIDTH, ballGB.position.y, BALL_RADIUS);
+            }
+
+            document.getElementById('sliderAngleLabel').innerText = Math.abs(currentStep) + "°";
+            rotSlider.value = -currentStep;
+
+            document.getElementById('cbSlider').value = Math.round(((cueBallY - cbMinY) / (obMaxY - cbMinY)) * 100);
+            document.getElementById('obSlider').value = Math.round(((pivotAnchorY - cbMinY) / (obMaxY - cbMinY)) * 100);
+
+            // --- STEP 9N: CONTINUOUSLY WRITE RESOLVED PHYSICS BACK TO PERCENTAGE TRACKING VARIABLE BASES ---
+            cbSliderPct = (cueBallY - cbMinY) / (obMaxY - cbMinY);
+            obSliderPct = (pivotAnchorY - cbMinY) / (obMaxY - cbMinY);
+
+            const panLabelEl = document.getElementById('sliderPanLabel');
+            panLabelEl.innerText = aimPanOffsetVal;
+            camPanSlider.value = aimPanOffsetVal;
+
+            if (aimPanOffsetVal === 0) {
+                panLabelEl.style.color = '#ffffff';
+            } else if (aimPanOffsetVal === computedContactShiftPctVal) {
+                panLabelEl.style.color = '#ffaa00';
+            } else {
+                panLabelEl.style.color = '#00ff41';
+            }
+        }
+
+        function signCheck(obX, gbX) { return obX >= gbX ? -1 : 1; }
+
+        const rotSlider = document.getElementById('rotSlider');
+        const rotationBox = document.getElementById('rotation-slider-box');
+
+        rotSlider.addEventListener('input', (e) => {
+            currentStep = -parseInt(e.target.value);
+        });
+
+        rotationBox.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const change = e.deltaY < 0 ? -1 : 1;
+            let targetVal = currentStep + change;
+            if (targetVal >= -90 && targetVal <= 90) {
+                currentStep = targetVal;
+            }
+        }, { passive: false });
+
+        const cbSlider = document.getElementById('cbSlider');
+        const obSlider = document.getElementById('obSlider');
+
+        window.lastInteractedSlider = '';
+
+        cbSlider.addEventListener('input', (e) => {
+            window.lastInteractedSlider = 'cbSlider';
+            cbSliderPct = parseInt(e.target.value) / 100;
+        });
+
+        obSlider.addEventListener('input', (e) => {
+            window.lastInteractedSlider = 'obSlider';
+            obSliderPct = parseInt(e.target.value) / 100;
+        });
+
+        document.getElementById('position-cb-box').addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const stepDelta = e.deltaY < 0 ? 1 : -1;
+            window.lastInteractedSlider = 'cbSlider';
+            let targetVal = parseInt(cbSlider.value) + stepDelta;
+            if (targetVal >= 0 && targetVal <= 100) {
+                cbSlider.value = targetVal;
+                cbSlider.dispatchEvent(new Event('input'));
+            }
+        }, { passive: false });
+
+        document.getElementById('position-ob-box').addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const stepDelta = e.deltaY < 0 ? 1 : -1;
+            window.lastInteractedSlider = 'obSlider';
+            let targetVal = parseInt(obSlider.value) + stepDelta;
+            if (targetVal >= 0 && targetVal <= 100) {
+                obSlider.value = targetVal;
+                obSlider.dispatchEvent(new Event('input'));
+            }
+        }, { passive: false });
+
+        const visibilityCb = document.getElementById('visibilityCb');
+        const visibilityOb = document.getElementById('visibilityOb');
+        const visibilityGb = document.getElementById('visibilityGb');
+
+        visibilityCb.addEventListener('input', (e) => {
+            matCB.opacity = (10 - e.target.value) / 10;
+        });
+        visibilityOb.addEventListener('input', (e) => {
+            matOB.opacity = (10 - e.target.value) / 10;
+        });
+        visibilityGb.addEventListener('input', (e) => {
+            matGB.opacity = (10 - e.target.value) / 10;
+        });
+
+        document.getElementById('transparency-cb-box').addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const visDelta = e.deltaY < 0 ? 1 : -1;
+            let proposedCbVal = parseInt(visibilityCb.value) + visDelta;
+            if (proposedCbVal >= 0 && proposedCbVal <= 10) {
+                visibilityCb.value = proposedCbVal;
+                visibilityCb.dispatchEvent(new Event('input'));
+            }
+        }, { passive: false });
+
+        document.getElementById('transparency-ob-box').addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const visDelta = e.deltaY < 0 ? 1 : -1;
+            let proposedObVal = parseInt(visibilityOb.value) + visDelta;
+            if (proposedObVal >= 0 && proposedObVal <= 10) {
+                visibilityOb.value = proposedObVal;
+                visibilityOb.dispatchEvent(new Event('input'));
+            }
+        }, { passive: false });
+
+        document.getElementById('transparency-gb-box').addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const visDelta = e.deltaY < 0 ? 1 : -1;
+            let proposedGbVal = parseInt(visibilityGb.value) + visDelta;
+            if (proposedGbVal >= 0 && proposedGbVal <= 10) {
+                visibilityGb.value = proposedGbVal;
+                visibilityGb.dispatchEvent(new Event('input'));
+            }
+        }, { passive: false });
+
+        const camPanSlider = document.getElementById('camPanSlider');
+        camPanSlider.addEventListener('input', (e) => {
+            aimPanOffsetVal = parseInt(e.target.value);
+        });
+
+        camHeightSlider.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            if (currentView === 'top') {
+                storedTopSliderVal = val;
+            } else {
+                storedAimSliderVal = val;
+            }
+            updateGeometryAndTransforms();
+        });
+
+        container.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const changeDelta = e.deltaY < 0 ? 4 : -4;
+
+            if (currentView === 'top') {
+                let proposed = storedTopSliderVal + changeDelta;
+                if (proposed < 45) proposed = 45;
+                if (proposed > 500) proposed = 500;
+                storedTopSliderVal = proposed;
+                camHeightSlider.value = proposed;
+            } else {
+                let proposed = storedAimSliderVal + changeDelta;
+                if (proposed < 16) proposed = 16;
+                if (proposed > 500) proposed = 500;
+                storedAimSliderVal = proposed;
+                camHeightSlider.value = proposed;
+            }
+        }, { passive: false });
+
+        document.getElementById('camera-height-box').addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const changeDelta = e.deltaY < 0 ? 4 : -4;
+
+            if (currentView === 'top') {
+                let proposed = storedTopSliderVal + changeDelta;
+                if (proposed < 45) proposed = 45;
+                if (proposed > 500) proposed = 500;
+                storedTopSliderVal = proposed;
+                camHeightSlider.value = proposed;
+            } else {
+                let proposed = storedAimSliderVal + changeDelta;
+                if (proposed < 16) proposed = 16;
+                if (proposed > 500) proposed = 500;
+                storedAimSliderVal = proposed;
+                camHeightSlider.value = proposed;
+            }
+        }, { passive: false });
+
+        document.getElementById('camera-pan-box').addEventListener('wheel', (e) => {
+            if (currentView !== 'aim') return;
+            e.preventDefault();
+            const panDelta = e.deltaY < 0 ? 1 : -1;
+            let proposedVal = parseInt(camPanSlider.value) + panDelta;
+            if (proposedVal >= -100 && proposedVal <= 100) {
+                camPanSlider.value = proposedVal;
+                camPanSlider.dispatchEvent(new Event('input'));
+            }
+        }, { passive: false });
+
+        const viewSelect = document.getElementById('viewSelect');
+
+        function triggerViewChange(newView) {
+            currentView = newView;
+            viewSelect.value = newView;
+
+            if (currentView === 'top') {
+                camHeightSlider.min = 45; camHeightSlider.max = 500;
+                camHeightSlider.value = storedTopSliderVal;
+            } else {
+                camHeightSlider.min = 16; camHeightSlider.max = 500;
+                camHeightSlider.value = storedAimSliderVal;
+            }
+
+            updateGeometryAndTransforms();
+        }
+
+        viewSelect.addEventListener('change', (e) => {
+            triggerViewChange(e.target.value);
+        });
+
+        viewSelect.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const rotatedView = (currentView === 'top') ? 'aim' : 'top';
+            triggerViewChange(rotatedView);
+        }, { passive: false });
+
+        document.getElementById('btnReset').addEventListener('click', () => {
+            currentStep = -30;
+            cbSliderPct = initialCbPct;
+            obSliderPct = initialObPct;
+            window.lastInteractedSlider = '';
+
+            const resetW = container.clientWidth;
+            const resetH = container.clientHeight;
+            let resetIdealWidth;
+            if ((resetW / resetH) > (TABLE_WIDTH / TABLE_LENGTH)) {
+                resetIdealWidth = TABLE_LENGTH * (resetW / resetH) * 1.05;
+            } else {
+                resetIdealWidth = TABLE_WIDTH * 1.05;
+            }
+
+            viewSelect.value = 'top';
+            currentView = 'top';
+
+            camHeightSlider.min = 45; camHeightSlider.max = 500;
+            topZoomFactor = resetIdealWidth / (12.0 * METERSPERFEET);
+
+            storedTopSliderVal = Math.round(topZoomFactor * 150);
+            storedAimSliderVal = 90;
+            camHeightSlider.value = storedTopSliderVal;
+
+            aimPanOffsetVal = 0.0;
+            camPanSlider.value = 0;
+
+            matCB.opacity = 1.0;
+            matOB.opacity = 1.0;
+            matGB.opacity = 0.4;
+            visibilityCb.value = 0;
+            visibilityOb.value = 0;
+            visibilityGb.value = 6;
+
+            document.getElementById('showAim').checked = true;
+            aimLine.visible = true;
+
+            document.getElementById('showContact').checked = true;
+            contactLine.visible = true;
+            document.getElementById('showTarget').checked = true;
+            targetLines.visible = true;
+            document.getElementById('showCloned').checked = false;
+            clonedLine.visible = false;
+            document.getElementById('showCaps').checked = true;
+            document.getElementById('extendAim').checked = false;
+
+            updateGeometryAndTransforms();
+        });
+
+        document.getElementById('showAim').addEventListener('change', (e) => aimLine.visible = e.target.checked);
+        document.getElementById('extendAim').addEventListener('change', updateGeometryAndTransforms);
+        document.getElementById('showContact').addEventListener('change', (e) => contactLine.visible = e.target.checked);
+
+        document.getElementById('showTarget').addEventListener('change', (e) => {
+            targetLines.visible = e.target.checked;
+            clonedLine.visible = e.target.checked && document.getElementById('showCloned').checked;
+        });
+        document.getElementById('showCloned').addEventListener('change', (e) => {
+            clonedLine.visible = e.target.checked && document.getElementById('showTarget').checked;
+        });
+
+        document.getElementById('showCaps').addEventListener('change', updateGeometryAndTransforms);
+
+        let isHelpDialogBuilt = false;
+
+        function buildHelpDialogFromText() {
+            if (isHelpDialogBuilt) return;
+
+            const tabHeaderRow = document.getElementById('help-tabs-header');
+            const tabPanelsBox = document.getElementById('help-panels-container');
+
+            const rawLines = helpTextSourceString.split('\n');
+
+            let tabsDataMap = {};
+            let currentTabKey = null;
+            let activeItemNode = null;
+            let descriptiveLineBuffer = [];
+
+            function flushDescriptionBuffer() {
+                if (!currentTabKey) return;
+
+                if (descriptiveLineBuffer.length > 0) {
+                    const singleContinuousParagraph = descriptiveLineBuffer.join(' ').trim();
+                    if (singleContinuousParagraph.length > 0) {
+                        if (tabsDataMap[currentTabKey].isAboutTab) {
+                            tabsDataMap[currentTabKey].paragraphs.push(singleContinuousParagraph);
+                        } else if (activeItemNode) {
+                            activeItemNode.paragraphs.push(singleContinuousParagraph);
+                        }
+                    }
+                    descriptiveLineBuffer = [];
+                }
+            }
+
+            for (let i = 0; i < rawLines.length; i++) {
+                const rawLine = rawLines[i];
+                const trimmedLine = rawLine.trim();
+
+                if (trimmedLine.startsWith('[') && trimmedLine.endsWith(']')) {
+                    flushDescriptionBuffer();
+                    currentTabKey = trimmedLine.slice(1, -1);
+
+                    if (currentTabKey.toLowerCase() === 'about') {
+                        tabsDataMap[currentTabKey] = { isAboutTab: true, paragraphs: [] };
+                    } else {
+                        tabsDataMap[currentTabKey] = { isAboutTab: false, nodes: [] };
+                    }
+                    activeItemNode = null;
+                    continue;
+                }
+
+                if (!currentTabKey) continue;
+
+                if (rawLine === '') {
+                    if (descriptiveLineBuffer.length > 0) {
+                        flushDescriptionBuffer();
+                    }
+                    continue;
+                }
+
+                if (rawLine.startsWith('    ') || rawLine.startsWith('\t')) {
+                    descriptiveLineBuffer.push(trimmedLine);
+                }
+                else if (trimmedLine.length > 0) {
+                    if (tabsDataMap[currentTabKey].isAboutTab) {
+                        descriptiveLineBuffer.push(trimmedLine);
+                    } else {
+                        flushDescriptionBuffer();
+                        activeItemNode = {
+                            term: trimmedLine,
+                            paragraphs: []
+                        };
+                        tabsDataMap[currentTabKey].nodes.push(activeItemNode);
+                    }
+                }
+            }
+            flushDescriptionBuffer();
+
+            let tabIndexCounter = 0;
+            for (const [tabTitle, tabContent] of Object.entries(tabsDataMap)) {
+                const uniqueIdSafeString = 'panel-tab-' + tabIndexCounter;
+
+                const btn = document.createElement('button');
+                btn.className = 'tab-btn' + (tabIndexCounter === 0 ? ' active-tab' : '');
+                btn.setAttribute('data-target', uniqueIdSafeString);
+                btn.innerText = tabTitle;
+                tabHeaderRow.appendChild(btn);
+
+                const panel = document.createElement('div');
+                panel.id = uniqueIdSafeString;
+                panel.className = 'tab-panel' + (tabIndexCounter === 0 ? ' active-panel' : '');
+
+                if (tabContent.isAboutTab) {
+                    const containerDiv = document.createElement('div');
+                    containerDiv.className = 'help-fullwidth';
+                    containerDiv.innerHTML = tabContent.paragraphs.join('<br><br>');
+                    panel.appendChild(containerDiv);
+                } else {
+                    const sectionContainer = document.createElement('div');
+                    sectionContainer.className = 'help-section-container';
+
+                    tabContent.nodes.forEach(node => {
+                        if (node.term.toLowerCase() === 'note') {
+                            const noteDiv = document.createElement('div');
+                            noteDiv.className = 'help-note';
+                            noteDiv.innerHTML = '<strong>Note:</strong> ' + node.paragraphs.join('<br><br>');
+                            sectionContainer.appendChild(noteDiv);
+                        } else {
+                            const termHeader = document.createElement('div');
+                            termHeader.className = 'help-term';
+                            termHeader.innerText = node.term;
+
+                            const descBlock = document.createElement('div');
+                            descBlock.className = 'help-desc';
+                            descBlock.innerHTML = node.paragraphs.join('<br><br>');
+
+                            sectionContainer.appendChild(termHeader);
+                            sectionContainer.appendChild(descBlock);
+                        }
+                    });
+                    panel.appendChild(sectionContainer);
+                }
+
+                tabPanelsBox.appendChild(panel);
+                tabIndexCounter++;
+            }
+
+            const generatedTabBtns = tabHeaderRow.querySelectorAll('.tab-btn');
+            const generatedTabPanels = tabPanelsBox.querySelectorAll('.tab-panel');
+
+            generatedTabBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    generatedTabBtns.forEach(b => b.classList.remove('active-tab'));
+                    generatedTabPanels.forEach(p => p.classList.remove('active-panel'));
+
+                    btn.classList.add('active-tab');
+                    const targetId = btn.getAttribute('data-target');
+                    document.getElementById(targetId).classList.add('active-panel');
+                });
+            });
+
+            isHelpDialogBuilt = true;
+        }
+
+        const helpModal = document.getElementById('help-modal');
+        const btnHelp = document.getElementById('btnHelp');
+        const btnCloseHelp = document.getElementById('btnCloseHelp');
+
+        btnHelp.addEventListener('click', () => {
+            buildHelpDialogFromText();
+            helpModal.classList.add('modal-open');
+        });
+
+        const dropModal = (e) => {
+            e.preventDefault();
+            helpModal.classList.remove('modal-open');
+        };
+
+        btnCloseHelp.addEventListener('click', dropModal);
+        helpModal.addEventListener('click', (e) => {
+            if (e.target === helpModal) dropModal(e);
+        });
+
+        const raycaster = new THREE.Raycaster();
+        const mouseVector = new THREE.Vector2();
+
+        let dragMode = null;
+        let initialMouseX = 0;
+        let initialAngleVal = 0;
+        // New variables to track the anchor point
+        let anchorMouseY = 0;
+        let anchorBallY = 0;
+
+        const planeTrackingTarget = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+        const intersectionPointWorld = new THREE.Vector3();
+
+        container.addEventListener('mousedown', (event) => {
+            const bounds = container.getBoundingClientRect();
+            mouseVector.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
+            mouseVector.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
+
+            const activeCam = (currentView === 'top') ? cameraTop : cameraAim;
+
+            // 1. Mesh-based click detection
+            raycaster.setFromCamera(mouseVector, activeCam);
+            const hits = raycaster.intersectObjects([ballCB, ballOB]);
+
+            if (hits.length > 0) {
+                const picked = hits[0].object;
+
+                // 2. Anchor the drag to the flat table plane
+                const groundRaycaster = new THREE.Raycaster();
+                groundRaycaster.setFromCamera(mouseVector, activeCam);
+
+                if (groundRaycaster.ray.intersectPlane(planeTrackingTarget, intersectionPointWorld)) {
+                    let worldY = intersectionPointWorld.y;
+                    if (currentView === 'top') {
+                        worldY += TABLE_LENGTH / 2;
+                    }
+
+                    // Capture the anchor points
+                    anchorMouseY = worldY;
+                    anchorBallY = (picked === ballCB) ? cueBallY : pivotAnchorY;
+                }
+
+                if (picked === ballCB) {
+                    dragMode = 'cb';
+                }
+                else if (picked === ballOB) {
+                    if (event.shiftKey) {
+                        dragMode = 'obAngle';
+                        initialMouseX = event.clientX;
+                        initialAngleVal = currentStep;
+                    } else {
+                        dragMode = 'ob';
+                    }
+                }
+            }
+        });
+
+        container.addEventListener('mousemove', (event) => {
+            if (!dragMode) return;
+
+            if (dragMode === 'obAngle') {
+                const deltaX = event.clientX - initialMouseX;
+                let calculatedStep = initialAngleVal - deltaX;
+                if (calculatedStep < -90) calculatedStep = -90;
+                if (calculatedStep > 90) calculatedStep = 90;
+                currentStep = calculatedStep;
+                return;
+            }
+
+            const bounds = container.getBoundingClientRect();
+            mouseVector.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
+            mouseVector.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1;
+
+            const activeCam = (currentView === 'top') ? cameraTop : cameraAim;
+            const groundRaycaster = new THREE.Raycaster();
+            groundRaycaster.setFromCamera(mouseVector, activeCam);
+
+            if (groundRaycaster.ray.intersectPlane(planeTrackingTarget, intersectionPointWorld)) {
+                let currentWorldY = intersectionPointWorld.y;
+                if (currentView === 'top') {
+                    currentWorldY += TABLE_LENGTH / 2;
+                }
+
+                // Calculate absolute movement from the anchor point
+                let movementOffset = currentWorldY - anchorMouseY;
+
+                if (dragMode === 'cb') {
+                    window.lastInteractedSlider = 'cbSlider';
+                    let targetBallY = anchorBallY + movementOffset;
+                    let pct = (targetBallY - cbMinYVal) / (obMaxYVal - cbMinYVal);
+                    cbSliderPct = Math.max(0.0, Math.min(1.0, pct));
+                }
+                else if (dragMode === 'ob') {
+                    window.lastInteractedSlider = 'obSlider';
+                    let targetBallY = anchorBallY + movementOffset;
+                    let pct = (targetBallY - cbMinYVal) / (obMaxYVal - cbMinYVal);
+                    obSliderPct = Math.max(0.0, Math.min(1.0, pct));
+                }
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            dragMode = null;
+        });
+
+        window.addEventListener('resize', () => {
+            const resizeW = container.clientWidth;
+            const resizeH = container.clientHeight;
+            let resizeIdealWidth;
+            if ((resizeW / resizeH) > (TABLE_WIDTH / TABLE_LENGTH)) {
+                resizeIdealWidth = TABLE_LENGTH * (resizeW / resizeH) * 1.05;
+            } else {
+                resizeIdealWidth = TABLE_WIDTH * 1.05;
+            }
+            topZoomFactor = resizeIdealWidth / (12.0 * METERSPERFEET);
+            updateGeometryAndTransforms();
+        });
+
+        function animate() {
+            //
+            // The userAgent check is an attempt to prevent the application from running
+            // on devices where it's unlikey to work. Decided not to reject iPads because
+            // the application's sliders work and their screens probably are big enough.
+            //
+
+            if (/Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                document.open();
+                document.write('<!DOCTYPE html>');
+                document.write('<html>');
+                document.write('<body>');
+                document.write('<div style="font-size: 42px; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: #111; color: #fff; font-family: sans-serif; text-align: center; padding: 20px;>"');
+                document.write('<h2>🖥️ Desktop Required</h2>');
+                document.write('<p>');
+                document.write('This billiards visualizer probably will not run properly on this device. Please open this link using a desktop or laptop browser.');
+                document.write('</p>');
+                document.write('</div>');
+                document.write('</body>');
+                document.write('</html>');
+                document.close();
+            } else {
+                requestAnimationFrame(animate);
+                updateGeometryAndTransforms();
+                const activeCam = (currentView === 'top') ? cameraTop : cameraAim;
+                renderer.render(scene, activeCam);
+            }
+        }
+
+        //
+        // Start the application.
+        //
+
+        animate();
+    </script>
+</body>
+</html>
