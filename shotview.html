@@ -80,6 +80,9 @@
                 --panel-border-width: 2px;
                 --panel-border-style: solid;
 
+                --slider-step-drag-threshold: 8;
+                --slider-title-drag-threshold: 25;
+
                 /*
                  * Help Settings
                  */
@@ -2101,25 +2104,32 @@
                 "pocket-line-checkbox": ["change"],
                 "pocket-line-cloned-checkbox": ["change"],
 
-                // Sliders & containers for wheel scrolling
+                // Sliders & containers for wheel scrolling and horizontal dragging
                 "cb-position-slider": ["input"],
                 "cb-position-slider-box": ["wheel"],
+                "cb-position-slider-box-labels": ["pointercancel", "pointerdown", "pointermove", "pointerup"],
                 "cb-transparency-slider": ["input"],
                 "cb-transparency-slider-box": ["wheel"],
+                "cb-transparency-slider-box-labels": ["pointercancel", "pointerdown", "pointermove", "pointerup"],
                 "ob-position-slider": ["input"],
                 "ob-position-slider-box": ["wheel"],
+                "ob-position-slider-box-labels": ["pointercancel", "pointerdown", "pointermove", "pointerup"],
                 "ob-transparency-slider": ["input"],
                 "ob-transparency-slider-box": ["wheel"],
+                "ob-transparency-slider-box-labels": ["pointercancel", "pointerdown", "pointermove", "pointerup"],
                 "gb-transparency-slider": ["input"],
                 "gb-transparency-slider-box": ["wheel"],
+                "gb-transparency-slider-box-labels": ["pointercancel", "pointerdown", "pointermove", "pointerup"],
                 "shift-slider-box": ["wheel"],
-                "shift-slider-title": ["wheel"],
+                "shift-slider-box-labels": ["pointercancel", "pointerdown", "pointermove", "pointerup"],
+                "shift-slider-title": ["pointercancel", "pointerdown", "pointermove", "pointerup", "wheel"],
                 "shift-slider-view-player": ["input"],
                 "shot-angle-slider": ["input"],
                 "shot-angle-slider-box": ["wheel"],
                 "shot-angle-slider-box-labels": ["pointercancel", "pointerdown", "pointermove", "pointerup"],
                 "shot-angle-slider-title": ["pointercancel", "pointerdown", "pointermove", "pointerup", "wheel"],
                 "height-slider-box": ["wheel"],
+                "height-slider-box-labels": ["pointercancel", "pointerdown", "pointermove", "pointerup"],
                 "height-slider-view-player": ["input"],
                 "height-slider-view-top": ["input"],
 
@@ -2654,7 +2664,9 @@
                         break;
 
                     case "height-slider-box":
+                    case "height-slider-box-labels":
                     case "shift-slider-box":
+                    case "shift-slider-box-labels":
                     case "shift-slider-title":
                         if ((target = handleSliderEvent(event, id.replace(/-(box|box-labels|title)$/, "") + "-" + ID_TO_ELEMENT["view-select"].value)) != null) {
                             THREE_UNIVERSE.syncUniverseTo(target);
@@ -2671,16 +2683,21 @@
 
                     case "cb-position-slider":
                     case "cb-position-slider-box":
+                    case "cb-position-slider-box-labels":
                     case "cb-transparency-slider":
                     case "cb-transparency-slider-box":
+                    case "cb-transparency-slider-box-labels":
                     case "gb-transparency-slider":
                     case "gb-transparency-slider-box":
+                    case "gb-transparency-slider-box-labels":
                     case "height-slider-view-top":
                     case "height-slider-view-player":
                     case "ob-position-slider":
                     case "ob-position-slider-box":
+                    case "ob-position-slider-box-labels":
                     case "ob-transparency-slider":
                     case "ob-transparency-slider-box":
+                    case "ob-transparency-slider-box-labels":
                     case "shift-slider-view-player":
                     case "shot-angle-slider":
                     case "shot-angle-slider-box":
@@ -2840,7 +2857,11 @@
 
                             case "pointermove":
                                 if (current_target._drag_start_x != null) {
-                                    threshold = current_target.id.endsWith("-title") ? 25 : 8;
+                                    if (current_target.id.endsWith("-title")) {
+                                        threshold = Number(CSS_GLOBALS["--slider-title-drag-threshold"]) || 25;
+                                    } else {
+                                        threshold = Number(CSS_GLOBALS["--slider-step-drag-threshold"]) || 8;
+                                    }
                                     delta_x = event.clientX - current_target._drag_start_x;
                                     if (Math.abs(delta_x) >= threshold) {
                                         direction = Math.sign(delta_x);
