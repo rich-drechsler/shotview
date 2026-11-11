@@ -10,7 +10,7 @@
 
 <html>
     <head>
-        <title>Billiard Shot View 1.1</title>
+        <title>Billiard Shot View 1.2</title>
 
         <style>
             /*
@@ -1477,10 +1477,11 @@
                 [T ]   real pool table with opaque balls.
                 [T ]
                 [H ] Platforms
-                [T ]   It should run in most browsers, but it was written assuming a decent size screen and
-                [T ]   a mouse (with a wheel) were always available. For the best results, we recommend using
-                [T ]   a desktop or laptop with a mouse that has a wheel. A Bluetooth mouse connected to an
-                [T ]   iPad can be useful.
+                [T ]   It should run in most browsers on desktops, laptops, tablets, and phones, though a
+                [T ]   decent size screen is always a plus. On a desktop or laptop, we recommend using a
+                [T ]   mouse that has a wheel. On an iPad, an Apple Pencil (or a compatible stylus) works
+                [T ]   very nicely, and a Bluetooth mouse with a wheel is another good option if you prefer
+                [T ]   using a mouse.
                 [T ]
                 [H ] History
                 [T ]   This application is based on a primitive Java 3D based program that I wrote in 2012.
@@ -1573,8 +1574,13 @@
                 [T ]
                 [^ ] Sliders
                 [T ]   All sliders respond to the mouse wheel, and the rotation direction moves all of them in the
-                [T ]   same direction. Slider titles with numeric values at their right margin respond to mouse wheel
-                [T ]   events that adjust their slider in discrete steps that are described below.
+                [T ]   same direction. You can also step any slider one unit at a time by dragging horizontally
+                [T ]   across the label row directly above the slider.
+                [T ]
+                [T ]   Slider titles with numeric values at their right margin respond to both mouse wheel rotation
+                [T ]   and horizontal dragging, adjusting their slider in discrete preset steps that are described
+                [T ]   below. The background of a label row or title darkens slightly while a horizontal drag is
+                [T ]   active.
                 [T ]
                 [H ]     Shot Angle
                 [T ]         This slider adjusts the direction that the Object Ball would travel in a world with no
@@ -1582,9 +1588,9 @@
                 [T ]         the two angles between the Pocket Line and the Extended Aim Line and the value of that
                 [T ]         angle is updated as the slider is adjusted.
                 [T ]
-                [T ]         Using the mouse wheel while the cursor is over the "Shot Angle" title steps the slider
-                [T ]         through preset angles (0°, 14°, 30°, 49°, and 90°) that correspond to traditional
-                [T ]         quarter-ball overlap fractions (full, 3/4, 1/2, 1/4, and edge).
+                [T ]         Using the mouse wheel or dragging horizontally on the "Shot Angle" title steps the
+                [T ]         slider through preset angles (0°, 14°, 30°, 49°, and 90°) that correspond to
+                [T ]         traditional quarter-ball overlap fractions (full, 3/4, 1/2, 1/4, and edge).
                 [T ]
                 [H ]     Position
                 [T ]         A pair of sliders that you can use to move the Cue Ball and the Object Ball. Motion of
@@ -1606,7 +1612,7 @@
                 [T ]         without rotating the camera. This lets you inspect edge overlaps and simulate finding
                 [T ]         your vision center. This slider is disabled in the Top View.
                 [T ]
-                [T ]         Using the mouse wheel while the cursor is over the "Camera Shift" title steps the
+                [T ]         Using the mouse wheel or dragging horizontally on the "Camera Shift" title steps the
                 [T ]         slider between three positions that align the camera with the Aim Line, the Contact
                 [T ]         Line, and the center of the Object Ball.
                 [T ]
