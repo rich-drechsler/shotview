@@ -189,6 +189,7 @@
                 --initial-aim-line-extended-checkbox_checked: false;
                 --initial-centers-box-checkbox_checked: false;
                 --initial-contact-caps-checkbox_checked: true;
+                --initial-contact-caps-full-checkbox_checked: false;
                 --initial-contact-line-checkbox_checked: true;
                 --initial-contact-line-extended-checkbox_checked: true;
                 --initial-pocket-line-checkbox_checked: true;
@@ -198,7 +199,7 @@
                 --initial-shot-angle-slider_max: 90;
                 --initial-shot-angle-slider_value: 30;
                 --initial-shot-angle-slider__label_id: "shot-angle-slider-value-label";
-                --initial-shot-angle-slider__label_descriptor: "abs(this.value) + '°'";         /* this ==> shot-angle-slider */
+                --initial-shot-angle-slider__label_descriptor: "abs(this.value) + '° (' + fraction(this.value) + ')'";
                 --initial-shot-angle-slider__stops: "-90, -49, -30, -14, 0, 14, 30, 49, 90";
 
                 --initial-cb-position-slider_min: 0;
@@ -639,6 +640,9 @@
 
                     <div class="control-flex-start-row">
                         <input type="checkbox" id="contact-caps-checkbox"><label for="contact-caps-checkbox">Contact<span style="color: var(--three-contact-caps-color);">&nbsp;Caps</span></label>
+                    </div>
+                    <div class="control-flex-start-row control-indented-row">
+                        <input type="checkbox" id="contact-caps-full-checkbox"><label for="contact-caps-full-checkbox">Full Overlap</label>
                     </div>
                 </div>
             </div>
@@ -1162,9 +1166,13 @@
                 [T ]         to the Aim Line and the Pocket Line.
                 [T ]
                 [H ]     Contact<span class="color-of-contact-caps"> Caps</span>
-                [T ]         A vertical plane containing the Contact Line splits the Cue Ball and Object Ball into
-                [T ]         matching pairs of larger and smaller spherical pieces. Selecting this checkbox paints
-                [T ]         the two smaller matching pieces.
+                [T ]         By default, a vertical plane containing the Contact Line splits the Cue Ball and
+                [T ]         Object Ball into matching pairs of larger and smaller spherical pieces, and this
+                [T ]         checkbox paints the two smaller pieces (showing half of the ball-to-ball overlap).
+                [T ]
+                [T ]         The "Full Overlap" checkbox, when selected, shifts the clipping planes to the
+                [T ]         inner edges of the two balls so the full ball-to-ball overlap is painted on both
+                [T ]         balls.
                 [T ]
                 [^ ] Sliders
                 [T ]   All sliders respond to the mouse wheel, and the rotation direction moves all of them in the
@@ -1179,8 +1187,9 @@
                 [H ]     Shot Angle
                 [T ]         This slider adjusts the direction that the Object Ball would travel in a world with no
                 [T ]         complications (like friction) after a collision with the Cue Ball. It's the smaller of
-                [T ]         the two angles between the Pocket Line and the Extended Aim Line and the value of that
-                [T ]         angle is updated as the slider is adjusted.
+                [T ]         the two angles between the Pocket Line and the Extended Aim Line. Both the cut angle
+                [T ]         in degrees and the corresponding ball-hit fraction (in parentheses) are updated as the
+                [T ]         slider is adjusted.
                 [T ]
                 [T ]         Using the mouse wheel or dragging horizontally on the "Shot Angle" title steps the
                 [T ]         slider through preset angles (0°, 14°, 30°, 49°, and 90°) that correspond to
@@ -2110,6 +2119,7 @@
                 "aim-line-extended-checkbox": ["change"],
                 "centers-box-checkbox": ["change"],
                 "contact-caps-checkbox": ["change"],
+                "contact-caps-full-checkbox": ["change"],
                 "contact-line-checkbox": ["change"],
                 "contact-line-extended-checkbox": ["change"],
                 "pocket-line-checkbox": ["change"],
@@ -2376,7 +2386,7 @@
                     positions.needsUpdate = true;
 
                     //
-                    // Contact Caps (world-space clipping planes along the Contact Line x = contact_x)
+                    // Contact Caps (world-space clipping planes along the Contact Line or full overlap)
                     //
                     if (angle_rad !== 0) {
                         sign = (angle_rad > 0) ? 1 : -1;
@@ -2384,9 +2394,14 @@
                         sign = this.cb_cap_plane.normal.x;
                     }
                     this.cb_cap_plane.normal.set(sign, 0, 0);
-                    this.cb_cap_plane.constant = -sign * contact_x;
                     this.ob_cap_plane.normal.set(-sign, 0, 0);
-                    this.ob_cap_plane.constant = sign * contact_x;
+                    if (ID_TO_ELEMENT["contact-caps-full-checkbox"].checked) {
+                        this.cb_cap_plane.constant = r - sign * ob_x;
+                        this.ob_cap_plane.constant = r;
+                    } else {
+                        this.cb_cap_plane.constant = -sign * contact_x;
+                        this.ob_cap_plane.constant = sign * contact_x;
+                    }
 
                     //
                     // Camera Shift stops (Aim Line, Contact Line, Object Ball Center)
@@ -2423,6 +2438,7 @@
                         this.syncUniverseTo(ID_TO_ELEMENT["aim-line-extended-checkbox"]);
                         this.syncUniverseTo(ID_TO_ELEMENT["centers-box-checkbox"]);
                         this.syncUniverseTo(ID_TO_ELEMENT["contact-caps-checkbox"]);
+                        this.syncUniverseTo(ID_TO_ELEMENT["contact-caps-full-checkbox"]);
                         this.syncUniverseTo(ID_TO_ELEMENT["contact-line-checkbox"]);
                         this.syncUniverseTo(ID_TO_ELEMENT["contact-line-extended-checkbox"]);
                         this.syncUniverseTo(ID_TO_ELEMENT["pocket-line-checkbox"]);
@@ -2477,6 +2493,7 @@
                             break;
 
                         case "aim-line-extended-checkbox":
+                        case "contact-caps-full-checkbox":
                         case "contact-line-extended-checkbox":
                             this.syncLines();
                             break;
@@ -2650,6 +2667,7 @@
                     case "aim-line-extended-checkbox":
                     case "centers-box-checkbox":
                     case "contact-caps-checkbox":
+                    case "contact-caps-full-checkbox":
                     case "contact-line-checkbox":
                     case "contact-line-extended-checkbox":
                     case "pocket-line-checkbox":
@@ -3162,7 +3180,7 @@
                 // runs during initialization any mistakes should be caught very early.
                 //
 
-                tokenizer = /^[ \t]*((["'])([\s\S]*)?\2|this[.]([A-Za-z0-9_]+)|([a-z]+)[\(]this[.]([A-Za-z0-9_]+)[\)])[ \t]*[+]?[ \t]*(.*)$/;
+                tokenizer = /^[ \t]*((["'])([\s\S]*?)\2|this[.]([A-Za-z0-9_]+)|([a-z]+)[\(]this[.]([A-Za-z0-9_]+)[\)])[ \t]*[+]?[ \t]*(.*)$/;
 
                 if (owner != null) {
                     if ((label_id = owner._label_id) != null) {
@@ -3180,13 +3198,22 @@
                                         } else if ((builtin = tokens[5]) != null) {
                                             if ((key = tokens[6]) != null) {
                                                 //
-                                                // It's a builtin - the only one we currently need is abs(),
-                                                // but more could be added.
+                                                // It's a builtin - currently supports abs() and fraction(),
+                                                // and more could be added.
                                                 //
                                                 switch (builtin) {
                                                     case "abs":
                                                         if (owner[key] !== undefined) {
                                                             label_text += Math.abs(Number(owner[key]));
+                                                        } else {
+                                                            console.error("key %s is not defined in owner %o", key, owner);
+                                                            throw new Error();
+                                                        }
+                                                        break;
+
+                                                    case "fraction":
+                                                        if (owner[key] !== undefined) {
+                                                            label_text += (1 - Math.sin(THREE.MathUtils.degToRad(Math.abs(Number(owner[key]))))).toFixed(2);
                                                         } else {
                                                             console.error("key %s is not defined in owner %o", key, owner);
                                                             throw new Error();
