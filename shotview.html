@@ -1046,6 +1046,395 @@
             }
         </script>
 
+        <script type="module" data-name="Tabbed Help Panel Builder">
+            window.app = window.app || {};
+
+            //
+            // This is the application's help text. It's a single string that's eventually split
+            // into individual lines that are processed by the parseTabbedPanelLines() function
+            // that's defined in the "Tabbed Panel Parser" module. Leading white space on each
+            // line is ignored and valid lines all start with a short prefix (called a selector)
+            // that tells parseTabbedPanelLines() what each line is supposed to represent.
+            //
+            // NOTE - the syntax that parseTabbedPanelLines() accepts and what it returns isn't
+            // currently documented, so if you're curious you'll have to look at the functions
+            // defined in the "Tabbed Panel Parser" module.
+            //
+
+            let TABBED_HELP_DESCRIPTION = `
+                [^ ] About
+                [T ]   What you get in this application is a boring look at a few billiard balls sitting on
+                [T ]   a flat green surface (that's supposed to represent a pool table) and some controls
+                [T ]   that let you modify what's displayed, move the balls up and down the table, or shift
+                [T ]   one of the balls slightly from left to right. It was designed to let you explore the
+                [T ]   pre-collision pool geometry in ways that might be difficult or impossible to do on a
+                [T ]   real pool table with opaque balls.
+                [T ]
+                [H ] Platforms
+                [T ]   It should run in most browsers on desktops, laptops, tablets, and phones, though a
+                [T ]   decent size screen is always a plus. On a desktop or laptop, we recommend using a
+                [T ]   mouse that has a wheel. On an iPad, an Apple Pencil (or a compatible stylus) works
+                [T ]   very nicely, and a Bluetooth mouse with a wheel is another good option if you prefer
+                [T ]   using a mouse.
+                [T ]
+                [H ] History
+                [T ]   This application is based on a primitive Java 3D based program that I wrote in 2012.
+                [T ]   It was a clunky program that was written quickly (probably in a few weeks) and then
+                [T ]   abandoned for more than a decade. I handed that old program to Gemini 3.5 Flash in
+                [T ]   late May 2026 and then guided Gemini as it built an HTML, JavaScript, and Three.js
+                [T ]   version that ran in a browser. It worked, so I decided to host it using GitHub Pages,
+                [T ]   but the source code was messy and really hard to modify.
+                [T ]
+                [T ]   This is a cleaned up version of that HTML, JavaScript, and Three.js application. My
+                [T ]   goal was to end up with a single HTML file that JavaScript programmers could read,
+                [T ]   modify, and perhaps use as a working example of Three.js code. If you're interested
+                [T ]   in Three.js take a look at the source code when your browser runs this application
+                [T ]   or visit my public GitHub repository
+                [T ]
+                [T4]       https://github.com/rich-drechsler/shotview
+                [T ]
+                [T ]   and decide for yourself. This version of the application was a collaboration between
+                [T ]   me (Richard Drechsler) and Google Gemini 4 Argon.
+                [T ]
+                [^ ] Balls
+                [T ]   Two letter abbreviations shown in parentheses below are used to label some of the GUI
+                [T ]   components and may also be used elsewhere in this documentation. The colors assigned
+                [T ]   to these abbreviations also match the color of the balls displayed on the table.
+                [T ]
+                [H ]     Cue Ball (<span class="color-of-CB">CB</span>)
+                [T ]         The ball that moves along the Aim Line until it contacts the Object Ball, which
+                [T ]         happens when its center reaches the center of the Ghost Ball. It can be moved
+                [T ]         along the Aim Line using the CB Position slider or by dragging the ball up and
+                [T ]         down the table with the cursor.
+                [T ]
+                [H ]     Object Ball (<span class="color-of-OB">OB</span>)
+                [T ]         The ball that is contacted by the Cue Ball, which only happens when the center of
+                [T ]         the Cue Ball reaches the center of the Ghost Ball. The Object Ball can be moved
+                [T ]         along a line that's parallel to the Aim Line using the OB Position slider or it
+                [T ]         can be dragged up and down the table with the cursor.
+                [T ]
+                [T ]         The Object Ball and Ghost Ball are always in contact, so moving the Object Ball
+                [T ]         also moves the Ghost Ball. Their relative orientation can be adjusted using the
+                [T ]         Shot Angle slider or by moving the cursor left and right (i.e., horizontally)
+                [T ]         during a drag that starts with the SHIFT key pressed.
+                [T ]
+                [H ]     Ghost Ball (<span class="color-of-GB">GB</span>)
+                [T ]         An imaginary ball positioned on the Aim Line right next to the Object Ball. It's
+                [T ]         often used to explain aiming in pool, particularly to new players. The line that
+                [T ]         connects the center of the Ghost Ball to the center of the Object Ball determines
+                [T ]         where the Object Ball would go after a collision in this application's geometric
+                [T ]         world.
+                [T ]
+                [^ ] Checkboxes
+                [T ]   The checkboxes described below are grouped in the "Visual Aids" panel and used to toggle
+                [T ]   geometric aids that are displayed on the table. Colors used in some checkbox labels match
+                [T ]   the color of the visual aid that the checkbox controls.
+                [T ]
+                [H ]     Aim<span class="color-of-aim-line"> Line</span>
+                [T ]         Controls the visibility of the line that connects the center of the Cue Ball to the
+                [T ]         center of the Ghost Ball. Cue Ball movement up and down the table is always locked
+                [T ]         onto this line, whether it's visible or not.
+                [T ]
+                [T ]         The "Extended" checkbox, when selected, extends the ends of this line. It's an easy
+                [T ]         way to tell when the Aim Line intersects the Object Ball.
+                [T ]
+                [H ]     Contact<span class="color-of-contact-line"> Line</span>
+                [T ]         Controls the visibility of the line that connects the contact point on the Object
+                [T ]         Ball to the contact point on the Cue Ball. Those points coincide when the collision
+                [T ]         happens, so when you see the Contact Line and the Aim Line you know you're looking
+                [T ]         at parallel lines.
+                [T ]
+                [T ]         The "Extended" checkbox, when selected, extends the ends of this line so they're
+                [T ]         horizontally aligned with the ends of the Extended Aim Line.
+                [T ]
+                [H ]     Pocket<span class="color-of-pocket-line"> Line</span>
+                [T ]         Controls the visibility of the line that connects the center of the Ghost Ball to the
+                [T ]         center of the Object Ball. This line represents the direction the Object Ball travels
+                [T ]         after a collision with the Cue Ball. Both ends are always extended to make sure that
+                [T ]         direction is always visible, even when both balls are opaque.
+                [T ]
+                [T ]         The "Cloned" checkbox, when selected, draws a parallel copy of this line through the
+                [T ]         center of the Cue Ball.
+                [T ]
+                [H ]     Centers<span class="color-of-centers-box"> Box</span>
+                [T ]         Controls the visibility of a box (parallelogram) with vertices at the centers of the
+                [T ]         Cue Ball, Ghost Ball, and Object Ball. The sides of this box will always be parallel
+                [T ]         to the Aim Line and the Pocket Line.
+                [T ]
+                [H ]     Contact<span class="color-of-contact-caps"> Caps</span>
+                [T ]         A vertical plane containing the Contact Line splits the Cue Ball and Object Ball into
+                [T ]         matching pairs of larger and smaller spherical pieces. Selecting this checkbox paints
+                [T ]         the two smaller matching pieces.
+                [T ]
+                [^ ] Sliders
+                [T ]   All sliders respond to the mouse wheel, and the rotation direction moves all of them in the
+                [T ]   same direction. You can also step any slider one unit at a time by dragging horizontally
+                [T ]   across the label row directly above the slider.
+                [T ]
+                [T ]   Slider titles with numeric values at their right margin respond to both mouse wheel rotation
+                [T ]   and horizontal dragging, adjusting their slider in discrete preset steps that are described
+                [T ]   below. The background of a label row or title darkens slightly while a horizontal drag is
+                [T ]   active.
+                [T ]
+                [H ]     Shot Angle
+                [T ]         This slider adjusts the direction that the Object Ball would travel in a world with no
+                [T ]         complications (like friction) after a collision with the Cue Ball. It's the smaller of
+                [T ]         the two angles between the Pocket Line and the Extended Aim Line and the value of that
+                [T ]         angle is updated as the slider is adjusted.
+                [T ]
+                [T ]         Using the mouse wheel or dragging horizontally on the "Shot Angle" title steps the
+                [T ]         slider through preset angles (0°, 14°, 30°, 49°, and 90°) that correspond to
+                [T ]         traditional quarter-ball overlap fractions (full, 3/4, 1/2, 1/4, and edge).
+                [T ]
+                [H ]     Position
+                [T ]         A pair of sliders that you can use to move the Cue Ball and the Object Ball. Motion of
+                [T ]         either one stops when the Cue Ball and Ghost Ball share the same point as their center.
+                [T ]
+                [H ]     Transparency
+                [T ]         Sliders that let you adjust the transparency of the Cue Ball, Object Ball, and Ghost
+                [T ]         Ball. Initially the Cue Ball and Object Ball are opaque and the Ghost Ball is visible
+                [T ]         but mostly transparent.
+                [T ]
+                [H ]     Camera Height
+                [T ]         Adjusts the vertical distance (elevation) of the camera above the table. In the Top
+                [T ]         View, raising or lowering the camera changes how much of the table is visible. In the
+                [T ]         Player View, it adjusts your eye level above the cloth, simulating standing higher or
+                [T ]         getting your chin right down near the cue.
+                [T ]
+                [H ]     Camera Shift
+                [T ]         Shifts the Player View camera horizontally to the left or right across the line of aim
+                [T ]         without rotating the camera. This lets you inspect edge overlaps and simulate finding
+                [T ]         your vision center. This slider is disabled in the Top View.
+                [T ]
+                [T ]         Using the mouse wheel or dragging horizontally on the "Camera Shift" title steps the
+                [T ]         slider between three positions that align the camera with the Aim Line, the Contact
+                [T ]         Line, and the center of the Object Ball.
+                [T ]
+                [^ ] Views
+                [T ]   The available cameras provide the different views of the table that can be selected using
+                [T ]   the dropdown menu that's positioned in the center of the bottom bar. Each mouse wheel click,
+                [T ]   while the cursor hovers over that dropdown menu, changes the selected view. The Cue Ball and
+                [T ]   Object Ball can be dragged in every available view.
+                [T ]
+                [H ]     Top View
+                [T ]         A birds-eye view from directly above the table. The mouse wheel can be used to raise
+                [T ]         or lower the camera, matching the behavior of the Camera Height slider. In this view,
+                [T ]         the Camera Shift slider is disabled.
+                [T ]
+                [H ]     Player View
+                [T ]         A view from the player's perspective that by default looks down the line of the shot.
+                [T ]         The mouse wheel adjusts camera elevation, matching the behavior of the Camera Height
+                [T ]         slider. The Camera Shift slider is active in this view and allows subtle lateral
+                [T ]         adjustment across the shot line.
+                [T ]
+            `;
+
+            const CSS_GLOBALS = window.app.CSS_GLOBALS;
+
+            window.app.buildTabbedHelpPanel = () => {
+                let count;
+                let element;
+                let heading_color;
+                let heading_font_size_large;
+                let heading_font_size_small;
+                let heading_margin_bottom;
+                let help_panel_container;
+                let help_tab_container;
+                let index;
+                let level_indent;
+                let panel;
+                let panels;
+                let paragraph;
+                let splash_panel;
+                let stack;
+                let tab_button;
+                let tab_index;
+                let tabs;
+
+                //
+                // Hands the TABBED_HELP_DESCRIPTION string to parseTabbedPanelDescription() and
+                // then uses the array that's returned to build the help panel. Using a two step
+                // process simplifies this function, reduces the error checking that has to be
+                // done here, and means the parseTabbedPanelDescription() function could be used
+                // by other applications.
+                //
+
+                level_indent = CSS_GLOBALS["--help-level-indent"] || "20px";
+                heading_margin_bottom = CSS_GLOBALS["--help-heading-margin-bottom"] || "10px";
+                heading_color = CSS_GLOBALS["--help-heading-foreground-color"] || "red";
+                heading_font_size_large = CSS_GLOBALS["--help-font-size-title"] || "18px";
+                heading_font_size_small = CSS_GLOBALS["--help-font-size"] || "16px";
+
+                if (TABBED_HELP_DESCRIPTION != null) {
+                    if ((stack = window.app.parseTabbedPanelDescription(TABBED_HELP_DESCRIPTION)) != null) {
+                        help_tab_container = window.app.ID_TO_ELEMENT["help-tab-container"];
+                        help_panel_container = window.app.ID_TO_ELEMENT["help-panel-container"];
+
+                        //
+                        // We'll build these in the next loop and use them later when the click
+                        // event listeners for the tab buttons are built.
+                        //
+
+                        tabs = [];
+                        panels = [];
+
+                        //
+                        // We use splash_panel to collect any text that precedes the first tab.
+                        // Anything added to splash_panel will be displayed the first time the
+                        // help tabbed panel is displayed. It's primarily a defensive move and
+                        // doesn't really provide a new feature, because that same text could
+                        // be displayed using a tab.
+                        //
+
+                        splash_panel = document.createElement("div");
+                        panel = splash_panel;
+
+                        for (index = 0; index < stack.length; index++) {
+                            element = stack[index];
+                            switch (element.type) {
+                                case "COMMENT":
+                                    //
+                                    // The replace(/--/g, "- -") hack used here isn't foolproof, but
+                                    // it's sufficient for our purposes. Change it if you disagree.
+                                    //
+                                    panel.appendChild(document.createComment(String(element.value).replace(/--/g, "- -")));
+                                    break;
+
+                                case "ERROR":
+                                    //
+                                    // parseTabbedPanelDescription() detected at least one error and
+                                    // wrote info about them to the console. This case gets to decide
+                                    // what happens and since it runs during initialization throwing
+                                    // an error should trigger the error handling that was installed
+                                    // by the "Startup Error Handling" module.
+                                    //
+                                    throw new Error();
+                                    break;
+
+                                case "FRAME":
+                                    //
+                                    // Currently ignored and element.value is empty, but it's not hard
+                                    // to imagine eventually doing something useful.
+                                    //
+                                    break;
+
+                                case "HEADING":
+                                    switch (element.arg) {
+                                        case "H":
+                                            panel.innerHTML += `<h3 style="font-size: ${heading_font_size_large}; margin-bottom: ${heading_margin_bottom}; color: ${heading_color};">${element.value}</h3>`;
+                                            break;
+
+                                        case "h":
+                                            panel.innerHTML += `<h4 style="font-size: ${heading_font_size_small}; margin-bottom: ${heading_margin_bottom}; color: ${heading_color};">${element.value}</h4>`;
+                                            break;
+
+                                        default:
+                                            throw new Error(`internal error - unimplemented heading argument ${element.arg}`);
+                                            break;
+                                    }
+                                    break;
+
+                                case "LEVEL":
+                                    //
+                                    // Nothing we need to do here. It's a record of a text indentation
+                                    // level change that the parser left on the stack. The parser could
+                                    // easily remove them as soon as the level is consumed by the next
+                                    // element or right after the parser's input ends. Leaving this in,
+                                    // for now anyway, means those changes can be implemented without
+                                    // affecting this function.
+                                    //
+                                    break;
+
+                                case "NEWLINE":
+                                    //
+                                    // When element.value is bigger than 1 this code adds breaks, as
+                                    // <br>, to generate an appropriate number of empty lines. If the
+                                    // case that handles "TEXT" uses <br> (rather than <p>) then this
+                                    // code probably needs to make sure
+                                    //
+                                    //     panel.innerHTML += "<br>";
+                                    //
+                                    // always happens at least once.
+                                    //
+                                    for (count = element.value; count > 1; count--) {
+                                        panel.innerHTML += "<br>";
+                                    }
+                                    break;
+
+                                case "TAB":
+                                    tab_index = tabs.length;
+                                    tab_button = document.createElement("button");
+                                    tab_button.className = (tab_index === 0) ? "help-tab-button active-tab" : "help-tab-button";
+                                    tab_button.innerText = element.value;
+                                    tab_button.setAttribute("data-tab-index", tab_index);
+                                    panel = document.createElement("div");
+                                    panel.className = (tab_index === 0) ? "help-tab-panel active-panel" : "help-tab-panel";
+
+                                    help_tab_container.appendChild(tab_button);
+                                    help_panel_container.appendChild(panel);
+
+                                    tabs.push(tab_button);
+                                    panels.push(panel);
+                                    break;
+
+                                case "TEXT":
+                                    paragraph = document.createElement("p");
+                                    paragraph.style.margin = "0px 10px";
+                                    paragraph.innerHTML = element.value;
+                                    if (element.level > 0) {
+                                        paragraph.style.marginLeft = `calc(${level_indent} * ${element.level})`;
+                                    }
+                                    panel.appendChild(paragraph);
+                                    break;
+
+                                default:
+                                    //
+                                    // Something's out of sync between parseTabbedPanelDescription() and
+                                    // this function, so quit to make sure the mismatch is noticed.
+                                    //
+                                    throw new Error(`internal error - missing case for ${element.type}`);
+                                    break;
+                            }
+                        }
+
+                        //
+                        // If there's anything in splash_panel make sure it's displayed the first
+                        // time the tabbed help panel is shown.
+                        //
+
+                        if (splash_panel.childNodes.length > 0) {
+                            tabs.forEach(t => t.classList.remove("active-tab"));
+                            panels.forEach(p => p.classList.remove("active-panel"));
+                            splash_panel.className = "help-tab-panel active-panel";
+                            help_panel_container.appendChild(splash_panel);
+                        } else {
+                            splash_panel = null;
+                        }
+
+                        //
+                        // Add click event listeners to each tab button.
+                        //
+
+                        tabs.forEach(tab => {
+                            tab.addEventListener("click", () => {
+                                if (splash_panel !== null) {
+                                    help_panel_container.removeChild(splash_panel);
+                                    splash_panel = null;
+                                }
+
+                                tabs.forEach(t => t.classList.remove("active-tab"));
+                                panels.forEach(p => p.classList.remove("active-panel"));
+
+                                tab.classList.add("active-tab");
+                                panels[tab.getAttribute("data-tab-index")].classList.add("active-panel");
+                            });
+                        });
+                    }
+                    TABBED_HELP_DESCRIPTION = null;           // won't need this again
+                }
+            }
+        </script>
+
         <script type="module" data-name="Tabbed Panel Parser">
             window.app = window.app || {};
 
@@ -1056,10 +1445,10 @@
             // of the "help" support code and also isolates most of the tricky error checking
             // to this module (so it doesn't have to be done when the HTML is built).
             //
-            // NOTE - the module named "Tabbed Help Panel Builder", which should follow this
-            // module, is where to go if you want an example of the text that's accepted by
-            // the parseTabbedPanelLines() function. It's also where you'll find a function
-            // that translates the output of parseTabbedPanelLines() into HTML.
+            // NOTE - the module named "Tabbed Help Panel Builder" is where to go if you want
+            // an example of the text that's accepted by parseTabbedPanelLines(). It's also
+            // where the function that translates the output of parseTabbedPanelLines() into
+            // HTML is defined.
             //
 
             window.app.parseTabbedPanelDescription = (description) => {
@@ -1448,395 +1837,6 @@
                     } else {
                         stack.push({"type": "NEWLINE", "arg": command, "value": 1, "level": level});
                     }
-                }
-            }
-        </script>
-
-        <script type="module" data-name="Tabbed Help Panel Builder">
-            window.app = window.app || {};
-
-            //
-            // This is the application's help text. It's a single string that's eventually split
-            // into individual lines that are processed by the parseTabbedPanelLines() function.
-            // Leading white space on each line is ignored and valid lines are all supposed to
-            // start with a short prefix (called a selector) that tells parseTabbedPanelLines()
-            // what each line is supposed to represent.
-            //
-            // NOTE - the syntax that parseTabbedPanelLines() accepts and what it returns isn't
-            // currently documented, so if you're curious you'll have to look at the functions
-            // defined in the "Tabbed Panel Parser" module.
-            //
-
-            let TABBED_HELP_DESCRIPTION = `
-                [^ ] About
-                [T ]   What you get in this application is a boring look at a few billiard balls sitting on
-                [T ]   a flat green surface (that's supposed to represent a pool table) and some controls
-                [T ]   that let you modify what's displayed, move the balls up and down the table, or shift
-                [T ]   one of the balls slightly from left to right. It was designed to let you explore the
-                [T ]   pre-collision pool geometry in ways that might be difficult or impossible to do on a
-                [T ]   real pool table with opaque balls.
-                [T ]
-                [H ] Platforms
-                [T ]   It should run in most browsers on desktops, laptops, tablets, and phones, though a
-                [T ]   decent size screen is always a plus. On a desktop or laptop, we recommend using a
-                [T ]   mouse that has a wheel. On an iPad, an Apple Pencil (or a compatible stylus) works
-                [T ]   very nicely, and a Bluetooth mouse with a wheel is another good option if you prefer
-                [T ]   using a mouse.
-                [T ]
-                [H ] History
-                [T ]   This application is based on a primitive Java 3D based program that I wrote in 2012.
-                [T ]   It was a clunky program that was written quickly (probably in a few weeks) and then
-                [T ]   abandoned for more than a decade. I handed that old program to Gemini 3.5 Flash in
-                [T ]   late May 2026 and then guided Gemini as it built an HTML, JavaScript, and Three.js
-                [T ]   version that ran in a browser. It worked, so I decided to host it using GitHub Pages,
-                [T ]   but the source code was messy and really hard to modify.
-                [T ]
-                [T ]   This is a cleaned up version of that HTML, JavaScript, and Three.js application. My
-                [T ]   goal was to end up with a single HTML file that JavaScript programmers could read,
-                [T ]   modify, and perhaps use as a working example of Three.js code. If you're interested
-                [T ]   in Three.js take a look at the source code when your browser runs this application
-                [T ]   or visit my public GitHub repository
-                [T ]
-                [T4]       https://github.com/rich-drechsler/shotview
-                [T ]
-                [T ]   and decide for yourself. This version of the application was a collaboration between
-                [T ]   me (Richard Drechsler) and Google Gemini 4 Argon.
-                [T ]
-                [^ ] Balls
-                [T ]   Two letter abbreviations shown in parentheses below are used to label some of the GUI
-                [T ]   components and may also be used elsewhere in this documentation. The colors assigned
-                [T ]   to these abbreviations also match the color of the balls displayed on the table.
-                [T ]
-                [H ]     Cue Ball (<span class="color-of-CB">CB</span>)
-                [T ]         The ball that moves along the Aim Line until it contacts the Object Ball, which
-                [T ]         happens when its center reaches the center of the Ghost Ball. It can be moved
-                [T ]         along the Aim Line using the CB Position slider or by dragging the ball up and
-                [T ]         down the table with the cursor.
-                [T ]
-                [H ]     Object Ball (<span class="color-of-OB">OB</span>)
-                [T ]         The ball that is contacted by the Cue Ball, which only happens when the center of
-                [T ]         the Cue Ball reaches the center of the Ghost Ball. The Object Ball can be moved
-                [T ]         along a line that's parallel to the Aim Line using the OB Position slider or it
-                [T ]         can be dragged up and down the table with the cursor.
-                [T ]
-                [T ]         The Object Ball and Ghost Ball are always in contact, so moving the Object Ball
-                [T ]         also moves the Ghost Ball. Their relative orientation can be adjusted using the
-                [T ]         Shot Angle slider or by moving the cursor left and right (i.e., horizontally)
-                [T ]         during a drag that starts with the SHIFT key pressed.
-                [T ]
-                [H ]     Ghost Ball (<span class="color-of-GB">GB</span>)
-                [T ]         An imaginary ball positioned on the Aim Line right next to the Object Ball. It's
-                [T ]         often used to explain aiming in pool, particularly to new players. The line that
-                [T ]         connects the center of the Ghost Ball to the center of the Object Ball determines
-                [T ]         where the Object Ball would go after a collision in this application's geometric
-                [T ]         world.
-                [T ]
-                [^ ] Checkboxes
-                [T ]   The checkboxes described below are grouped in the "Visual Aids" panel and used to toggle
-                [T ]   geometric aids that are displayed on the table. Colors used in some checkbox labels match
-                [T ]   the color of the visual aid that the checkbox controls.
-                [T ]
-                [H ]     Aim<span class="color-of-aim-line"> Line</span>
-                [T ]         Controls the visibility of the line that connects the center of the Cue Ball to the
-                [T ]         center of the Ghost Ball. Cue Ball movement up and down the table is always locked
-                [T ]         onto this line, whether it's visible or not.
-                [T ]
-                [T ]         The "Extended" checkbox, when selected, extends the ends of this line. It's an easy
-                [T ]         way to tell when the Aim Line intersects the Object Ball.
-                [T ]
-                [H ]     Contact<span class="color-of-contact-line"> Line</span>
-                [T ]         Controls the visibility of the line that connects the contact point on the Object
-                [T ]         Ball to the contact point on the Cue Ball. Those points coincide when the collision
-                [T ]         happens, so when you see the Contact Line and the Aim Line you know you're looking
-                [T ]         at parallel lines.
-                [T ]
-                [T ]         The "Extended" checkbox, when selected, extends the ends of this line so they're
-                [T ]         horizontally aligned with the ends of the Extended Aim Line.
-                [T ]
-                [H ]     Pocket<span class="color-of-pocket-line"> Line</span>
-                [T ]         Controls the visibility of the line that connects the center of the Ghost Ball to the
-                [T ]         center of the Object Ball. This line represents the direction the Object Ball travels
-                [T ]         after a collision with the Cue Ball. Both ends are always extended to make sure that
-                [T ]         direction is always visible, even when both balls are opaque.
-                [T ]
-                [T ]         The "Cloned" checkbox, when selected, draws a parallel copy of this line through the
-                [T ]         center of the Cue Ball.
-                [T ]
-                [H ]     Centers<span class="color-of-centers-box"> Box</span>
-                [T ]         Controls the visibility of a box (parallelogram) with vertices at the centers of the
-                [T ]         Cue Ball, Ghost Ball, and Object Ball. The sides of this box will always be parallel
-                [T ]         to the Aim Line and the Pocket Line.
-                [T ]
-                [H ]     Contact<span class="color-of-contact-caps"> Caps</span>
-                [T ]         A vertical plane containing the Contact Line splits the Cue Ball and Object Ball into
-                [T ]         matching pairs of larger and smaller spherical pieces. Selecting this checkbox paints
-                [T ]         the two smaller matching pieces.
-                [T ]
-                [^ ] Sliders
-                [T ]   All sliders respond to the mouse wheel, and the rotation direction moves all of them in the
-                [T ]   same direction. You can also step any slider one unit at a time by dragging horizontally
-                [T ]   across the label row directly above the slider.
-                [T ]
-                [T ]   Slider titles with numeric values at their right margin respond to both mouse wheel rotation
-                [T ]   and horizontal dragging, adjusting their slider in discrete preset steps that are described
-                [T ]   below. The background of a label row or title darkens slightly while a horizontal drag is
-                [T ]   active.
-                [T ]
-                [H ]     Shot Angle
-                [T ]         This slider adjusts the direction that the Object Ball would travel in a world with no
-                [T ]         complications (like friction) after a collision with the Cue Ball. It's the smaller of
-                [T ]         the two angles between the Pocket Line and the Extended Aim Line and the value of that
-                [T ]         angle is updated as the slider is adjusted.
-                [T ]
-                [T ]         Using the mouse wheel or dragging horizontally on the "Shot Angle" title steps the
-                [T ]         slider through preset angles (0°, 14°, 30°, 49°, and 90°) that correspond to
-                [T ]         traditional quarter-ball overlap fractions (full, 3/4, 1/2, 1/4, and edge).
-                [T ]
-                [H ]     Position
-                [T ]         A pair of sliders that you can use to move the Cue Ball and the Object Ball. Motion of
-                [T ]         either one stops when the Cue Ball and Ghost Ball share the same point as their center.
-                [T ]
-                [H ]     Transparency
-                [T ]         Sliders that let you adjust the transparency of the Cue Ball, Object Ball, and Ghost
-                [T ]         Ball. Initially the Cue Ball and Object Ball are opaque and the Ghost Ball is visible
-                [T ]         but mostly transparent.
-                [T ]
-                [H ]     Camera Height
-                [T ]         Adjusts the vertical distance (elevation) of the camera above the table. In the Top
-                [T ]         View, raising or lowering the camera changes how much of the table is visible. In the
-                [T ]         Player View, it adjusts your eye level above the cloth, simulating standing higher or
-                [T ]         getting your chin right down near the cue.
-                [T ]
-                [H ]     Camera Shift
-                [T ]         Shifts the Player View camera horizontally to the left or right across the line of aim
-                [T ]         without rotating the camera. This lets you inspect edge overlaps and simulate finding
-                [T ]         your vision center. This slider is disabled in the Top View.
-                [T ]
-                [T ]         Using the mouse wheel or dragging horizontally on the "Camera Shift" title steps the
-                [T ]         slider between three positions that align the camera with the Aim Line, the Contact
-                [T ]         Line, and the center of the Object Ball.
-                [T ]
-                [^ ] Views
-                [T ]   The available cameras provide the different views of the table that can be selected using
-                [T ]   the dropdown menu that's positioned in the center of the bottom bar. Each mouse wheel click,
-                [T ]   while the cursor hovers over that dropdown menu, changes the selected view. The Cue Ball and
-                [T ]   Object Ball can be dragged in every available view.
-                [T ]
-                [H ]     Top View
-                [T ]         A birds-eye view from directly above the table. The mouse wheel can be used to raise
-                [T ]         or lower the camera, matching the behavior of the Camera Height slider. In this view,
-                [T ]         the Camera Shift slider is disabled.
-                [T ]
-                [H ]     Player View
-                [T ]         A view from the player's perspective that by default looks down the line of the shot.
-                [T ]         The mouse wheel adjusts camera elevation, matching the behavior of the Camera Height
-                [T ]         slider. The Camera Shift slider is active in this view and allows subtle lateral
-                [T ]         adjustment across the shot line.
-                [T ]
-            `;
-
-            const CSS_GLOBALS = window.app.CSS_GLOBALS;
-
-            window.app.buildTabbedHelpPanel = () => {
-                let count;
-                let element;
-                let heading_color;
-                let heading_font_size_large;
-                let heading_font_size_small;
-                let heading_margin_bottom;
-                let help_panel_container;
-                let help_tab_container;
-                let index;
-                let level_indent;
-                let panel;
-                let panels;
-                let paragraph;
-                let splash_panel;
-                let stack;
-                let tab_button;
-                let tab_index;
-                let tabs;
-
-                //
-                // Hands the TABBED_HELP_DESCRIPTION string to parseTabbedPanelDescription() and
-                // then uses the array that's returned to build the help panel. Using a two step
-                // process simplifies this function, reduces the error checking that has to be
-                // done here, and means the parseTabbedPanelDescription() function could be used
-                // by other applications.
-                //
-
-                level_indent = CSS_GLOBALS["--help-level-indent"] || "20px";
-                heading_margin_bottom = CSS_GLOBALS["--help-heading-margin-bottom"] || "10px";
-                heading_color = CSS_GLOBALS["--help-heading-foreground-color"] || "red";
-                heading_font_size_large = CSS_GLOBALS["--help-font-size-title"] || "18px";
-                heading_font_size_small = CSS_GLOBALS["--help-font-size"] || "16px";
-
-                if (TABBED_HELP_DESCRIPTION != null) {
-                    if ((stack = window.app.parseTabbedPanelDescription(TABBED_HELP_DESCRIPTION)) != null) {
-                        help_tab_container = window.app.ID_TO_ELEMENT["help-tab-container"];
-                        help_panel_container = window.app.ID_TO_ELEMENT["help-panel-container"];
-
-                        //
-                        // We'll build these in the next loop and use them later when the click
-                        // event listeners for the tab buttons are built.
-                        //
-
-                        tabs = [];
-                        panels = [];
-
-                        //
-                        // We use splash_panel to collect any text that precedes the first tab.
-                        // Anything added to splash_panel will be displayed the first time the
-                        // help tabbed panel is displayed. It's primarily a defensive move and
-                        // doesn't really provide a new feature, because that same text could
-                        // be displayed using a tab.
-                        //
-
-                        splash_panel = document.createElement("div");
-                        panel = splash_panel;
-
-                        for (index = 0; index < stack.length; index++) {
-                            element = stack[index];
-                            switch (element.type) {
-                                case "COMMENT":
-                                    //
-                                    // The replace(/--/g, "- -") hack isn't foolproof, but it's
-                                    // sufficient for our purposes. Fix it if you disagree.
-                                    //
-                                    panel.appendChild(document.createComment(String(element.value).replace(/--/g, "- -")));
-                                    break;
-
-                                case "ERROR":
-                                    //
-                                    // parseTabbedPanelDescription() detected at least one error and
-                                    // wrote info about them to the console. This case gets to decide
-                                    // what happens and since it runs during initialization throwing
-                                    // an error should trigger the error handling that was installed
-                                    // by the "Startup Error Handling" module.
-                                    //
-                                    throw new Error();
-                                    break;
-
-                                case "FRAME":
-                                    //
-                                    // Currently ignored and element.value is empty, but it's not hard
-                                    // to imagine eventually doing something useful.
-                                    //
-                                    break;
-
-                                case "HEADING":
-                                    switch (element.arg) {
-                                        case "H":
-                                            panel.innerHTML += `<h3 style="font-size: ${heading_font_size_large}; margin-bottom: ${heading_margin_bottom}; color: ${heading_color};">${element.value}</h3>`;
-                                            break;
-
-                                        case "h":
-                                            panel.innerHTML += `<h4 style="font-size: ${heading_font_size_small}; margin-bottom: ${heading_margin_bottom}; color: ${heading_color};">${element.value}</h4>`;
-                                            break;
-
-                                        default:
-                                            throw new Error(`internal error - unimplemented heading argument ${element.arg}`);
-                                            break;
-                                    }
-                                    break;
-
-                                case "LEVEL":
-                                    //
-                                    // Nothing we need to do here. It's a record of a text indentation
-                                    // level change that the parser left on the stack. The parser could
-                                    // easily remove them as soon as the level is consumed by the next
-                                    // element or right after the parser's input ends. Leaving this in,
-                                    // for now anyway, means those changes can be implemented without
-                                    // affecting this function.
-                                    //
-                                    break;
-
-                                case "NEWLINE":
-                                    //
-                                    // When element.value is bigger than 1 this code adds breaks, as
-                                    // <br>, to generate an appropriate number of empty lines. If the
-                                    // case that handles "TEXT" uses <br> (rather than <p>) then this
-                                    // code probably needs to make sure
-                                    //
-                                    //     panel.innerHTML += "<br>";
-                                    //
-                                    // always happens at least once.
-                                    //
-                                    for (count = element.value; count > 1; count--) {
-                                        panel.innerHTML += "<br>";
-                                    }
-                                    break;
-
-                                case "TAB":
-                                    tab_index = tabs.length;
-                                    tab_button = document.createElement("button");
-                                    tab_button.className = (tab_index === 0) ? "help-tab-button active-tab" : "help-tab-button";
-                                    tab_button.innerText = element.value;
-                                    tab_button.setAttribute("data-tab-index", tab_index);
-                                    panel = document.createElement("div");
-                                    panel.className = (tab_index === 0) ? "help-tab-panel active-panel" : "help-tab-panel";
-
-                                    help_tab_container.appendChild(tab_button);
-                                    help_panel_container.appendChild(panel);
-
-                                    tabs.push(tab_button);
-                                    panels.push(panel);
-                                    break;
-
-                                case "TEXT":
-                                    paragraph = document.createElement("p");
-                                    paragraph.style.margin = "0px 10px";
-                                    paragraph.innerHTML = element.value;
-                                    if (element.level > 0) {
-                                        paragraph.style.marginLeft = `calc(${level_indent} * ${element.level})`;
-                                    }
-                                    panel.appendChild(paragraph);
-                                    break;
-
-                                default:
-                                    //
-                                    // Something's out of sync between parseTabbedPanelDescription() and
-                                    // this function, so quit to make sure the mismatch is noticed.
-                                    //
-                                    throw new Error(`internal error - missing case for ${element.type}`);
-                                    break;
-                            }
-                        }
-
-                        //
-                        // If there's anything in splash_panel make sure it's displayed the first
-                        // time the tabbed help panel is shown.
-                        //
-
-                        if (splash_panel.childNodes.length > 0) {
-                            tabs.forEach(t => t.classList.remove("active-tab"));
-                            panels.forEach(p => p.classList.remove("active-panel"));
-                            splash_panel.className = "help-tab-panel active-panel";
-                            help_panel_container.appendChild(splash_panel);
-                        } else {
-                            splash_panel = null;
-                        }
-
-                        //
-                        // Add click event listeners to each tab button.
-                        //
-
-                        tabs.forEach(tab => {
-                            tab.addEventListener("click", () => {
-                                if (splash_panel !== null) {
-                                    help_panel_container.removeChild(splash_panel);
-                                    splash_panel = null;
-                                }
-
-                                tabs.forEach(t => t.classList.remove("active-tab"));
-                                panels.forEach(p => p.classList.remove("active-panel"));
-
-                                tab.classList.add("active-tab");
-                                panels[tab.getAttribute("data-tab-index")].classList.add("active-panel");
-                            });
-                        });
-                    }
-                    TABBED_HELP_DESCRIPTION = null;           // won't need this again
                 }
             }
         </script>
