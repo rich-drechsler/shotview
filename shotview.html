@@ -180,9 +180,8 @@
                  * NOTE - values assigned to CSS variables that end in "_label_descriptor"
                  * are parsed by the syncLabelTo() function. What's recognized is limited
                  * and currently just includes "this", which resolves to the element that
-                 * owns the "_label_descriptor" property, and abs() when we want to make
-                 * sure the string displayed in the associated label doesn't start with a
-                 * negative sign.
+                 * owns the "_label_descriptor" property, and the builtins abs() and
+                 * fraction().
                  */
 
                 --initial-aim-line-checkbox_checked: true;
@@ -199,7 +198,7 @@
                 --initial-shot-angle-slider_max: 90;
                 --initial-shot-angle-slider_value: 30;
                 --initial-shot-angle-slider__label_id: "shot-angle-slider-value-label";
-                --initial-shot-angle-slider__label_descriptor: "abs(this.value) + '° (' + fraction(this.value) + ')'";
+                --initial-shot-angle-slider__label_descriptor: "'(' + fraction(this.value) + ') ' + abs(this.value) + '°'";
                 --initial-shot-angle-slider__stops: "-90, -49, -30, -14, 0, 14, 30, 49, 90";
 
                 --initial-cb-position-slider_min: 0;
@@ -3213,7 +3212,31 @@
 
                                                     case "fraction":
                                                         if (owner[key] !== undefined) {
-                                                            label_text += (1 - Math.sin(THREE.MathUtils.degToRad(Math.abs(Number(owner[key]))))).toFixed(2);
+                                                            switch (Math.abs(Number(owner[key]))) {
+                                                                case 0:
+                                                                    label_text += "1";
+                                                                    break;
+
+                                                                case 14:
+                                                                    label_text += "3/4";
+                                                                    break;
+
+                                                                case 30:
+                                                                    label_text += "1/2";
+                                                                    break;
+
+                                                                case 49:
+                                                                    label_text += "1/4";
+                                                                    break;
+
+                                                                case 90:
+                                                                    label_text += "0";
+                                                                    break;
+
+                                                                default:
+                                                                    label_text += (1 - Math.sin(THREE.MathUtils.degToRad(Math.abs(Number(owner[key]))))).toFixed(2);
+                                                                    break;
+                                                            }
                                                         } else {
                                                             console.error("key %s is not defined in owner %o", key, owner);
                                                             throw new Error();
